@@ -11,7 +11,8 @@ install scripts install this snapshot and its marketplace read the plugin from i
 replaces `<user data folder>/dev-build/` with it in one step, so no chat reads half-written files. That folder is the
 source tree of the commit, so it is also a local Claude Code marketplace with the release's name. Then the CLI is
 installed from it (not editable: it stays as built), Claude Code's marketplace is pointed at it and the plugin updated,
-and any other enabled plugin named explainer-studio (for example a copy from another marketplace) is disabled.
+and the other enabled plugins that carry an explainer-studio skill are disabled: the Heptabase plugin (with its MCP
+tools, until use_release.py) and any other plugin named explainer-studio.
 
 A computer uses one version at a time: new chats use the dev build, and running chats are told to print the guide again
 at their next command on an episode. `scripts/use_release.py` switches back.
@@ -31,10 +32,12 @@ from pathlib import Path
 
 from filelock import FileLock, Timeout
 from installation import (
+    HEPTABASE_PLUGIN_NAME,
     MARKETPLACE_NAME,
     PLUGIN_ID,
+    PLUGIN_NAME,
     REPOSITORY_DIR_PATH,
-    disable_other_plugins,
+    disable_plugins,
     find_claude,
     find_installed_plugin_version,
     find_marketplace,
@@ -118,8 +121,8 @@ def run_bytes(command: list[str]) -> bytes:
 
 
 def use_in_claude_code(claude_path: str, dev_build_dir_path: Path, version: str) -> list[str]:
-    """Point the marketplace at the dev build folder, install and update the plugin, disable other plugins named
-    explainer-studio. Returns what changed, for the summary."""
+    """Point the marketplace at the dev build folder, install and update the plugin, disable the other plugins that carry
+    the skill. Returns what changed, for the summary."""
     lines = []
     current_marketplace = find_marketplace(claude_path)
     is_dev_build_marketplace = (current_marketplace is not None and current_marketplace.get("source") == "directory"
@@ -139,7 +142,7 @@ def use_in_claude_code(claude_path: str, dev_build_dir_path: Path, version: str)
         raise StudioError(f"Claude Code lists {PLUGIN_ID} {installed_version}, not {version}",
                           "the plugin update did not pick up the dev build",
                           f"run `claude plugin update {PLUGIN_ID} --scope user` to see why")
-    return lines + disable_other_plugins(claude_path)
+    return lines + disable_plugins(claude_path, {PLUGIN_NAME, HEPTABASE_PLUGIN_NAME})
 
 
 def use_dev_build(ref: str | None) -> None:
@@ -173,7 +176,7 @@ def use_dev_build(ref: str | None) -> None:
     for line in lines:
         print(f"  {line}")
     print("New chats use it. Running chats are told at their next command on an episode to print the guide again.")
-    print("Switch back to the release with: uv run python scripts/use_release.py")
+    print("Switch back to the release, and the Heptabase plugin, with: uv run python scripts/use_release.py")
 
 
 def main() -> None:

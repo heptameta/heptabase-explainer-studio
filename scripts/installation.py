@@ -1,9 +1,11 @@
 """What use_dev_build.py and use_release.py change on this computer: the `explainer-studio` command (through uv) and
-the Claude Code plugin (through `claude plugin`).
+the Claude Code plugins that carry the skill (through `claude plugin`).
 
-The plugin is `explainer-studio@heptabase-explainer-studio` in both cases: the release's marketplace is the GitHub
-repository, a dev build's is the local dev build folder under the same name. Claude Code's state is read from its
-`--json` output, never from its files.
+Users get the skill from the Heptabase plugin (`heptabase`, from heptameta/heptabase-agent-plugins or a plugin
+directory). A dev build's skill is the plugin `explainer-studio@heptabase-explainer-studio`, whose marketplace is the
+local dev build folder. Two skills of the same name in one chat contradict each other, and Claude Code turns plugins on
+and off only as a whole, so a dev build disables the Heptabase plugin (its MCP tools too) and the release enables it
+again. Claude Code's state is read from its `--json` output, never from its files.
 """
 
 from __future__ import annotations
@@ -24,6 +26,9 @@ from explainer_studio.errors import StudioError
 MARKETPLACE_NAME = "heptabase-explainer-studio"
 PLUGIN_NAME = "explainer-studio"
 PLUGIN_ID = f"{PLUGIN_NAME}@{MARKETPLACE_NAME}"
+HEPTABASE_PLUGIN_NAME = "heptabase"  # carries the released skill
+HEPTABASE_MARKETPLACE_NAME = "heptabase-agent-plugins"
+HEPTABASE_MARKETPLACE_REPO = "heptameta/heptabase-agent-plugins"
 PYTHON_VERSION = "3.13"  # the Python the skill's install scripts install the CLI with
 
 
@@ -91,9 +96,9 @@ def run_claude_action(claude_path: str, *arguments: str, cwd: Path | None = None
     return json.loads(lines[-1]) if lines else {}
 
 
-def find_marketplace(claude_path: str) -> dict[str, Any] | None:
+def find_marketplace(claude_path: str, name: str = MARKETPLACE_NAME) -> dict[str, Any] | None:
     return next((marketplace for marketplace in run_claude_list(claude_path, "plugin", "marketplace", "list")
-                 if marketplace.get("name") == MARKETPLACE_NAME), None)
+                 if marketplace.get("name") == name), None)
 
 
 def list_plugin_installs(claude_path: str) -> list[dict[str, Any]]:
@@ -133,20 +138,47 @@ def update_plugin(claude_path: str) -> list[str]:
     return notes
 
 
-def disable_other_plugins(claude_path: str) -> list[str]:
-    """Disable every other enabled plugin named explainer-studio (for example one from another marketplace): two skills of
-    the same name in one chat contradict each other. Returns what changed, for the summary."""
+def read_plugin_name(install: dict[str, Any]) -> str:
+    return str(install.get("id")).partition("@")[0]
+
+
+def disable_plugins(claude_path: str, plugin_names: set[str]) -> list[str]:
+    """Disable every enabled plugin named in `plugin_names` other than this repository's dev build plugin: each carries an
+    explainer-studio skill. Returns what changed, for the summary."""
     lines = []
-    for other_install in list_plugin_installs(claude_path):
-        name, _, marketplace_name = str(other_install.get("id")).partition("@")
-        if name != PLUGIN_NAME or marketplace_name == MARKETPLACE_NAME or not other_install.get("enabled"):
+    for install in list_plugin_installs(claude_path):
+        if read_plugin_name(install) not in plugin_names or install.get("id") == PLUGIN_ID or not install.get("enabled"):
             continue
-        scope, cwd = str(other_install.get("scope")), resolve_install_cwd(other_install)
+        scope, cwd = str(install.get("scope")), resolve_install_cwd(install)
         if cwd is not None and not cwd.is_dir():
             continue
-        run_claude_action(claude_path, "plugin", "disable", other_install["id"], "--scope", scope, cwd=cwd)
-        lines.append(f"disabled {other_install['id']} ({scope} scope); to use it again: claude plugin enable "
-                     f"{other_install['id']} --scope {scope}" + (f", run in {cwd}" if cwd else ""))
+        run_claude_action(claude_path, "plugin", "disable", install["id"], "--scope", scope, cwd=cwd)
+        lines.append(f"disabled {install['id']} ({scope} scope" + (f", in {cwd}" if cwd else "") + ")")
+    return lines
+
+
+def use_heptabase_plugin(claude_path: str) -> list[str]:
+    """Bring every install of the Heptabase plugin up to its marketplace's version and enable it, one a dev build
+    disabled or not; without an install, install it at user scope from its GitHub marketplace. Returns what changed."""
+    installs = [install for install in list_plugin_installs(claude_path)
+                if read_plugin_name(install) == HEPTABASE_PLUGIN_NAME]
+    if not installs:
+        if find_marketplace(claude_path, HEPTABASE_MARKETPLACE_NAME) is None:
+            run_claude_action(claude_path, "plugin", "marketplace", "add", HEPTABASE_MARKETPLACE_REPO)
+        plugin_id = f"{HEPTABASE_PLUGIN_NAME}@{HEPTABASE_MARKETPLACE_NAME}"
+        run_claude_action(claude_path, "plugin", "install", plugin_id, "--scope", "user")
+        return [f"installed {plugin_id} (user scope)"]
+    for marketplace_name in sorted({str(install.get("id")).partition("@")[2] for install in installs}):
+        run_claude_action(claude_path, "plugin", "marketplace", "update", marketplace_name)
+    lines = []
+    for install in installs:
+        scope, cwd = str(install.get("scope")), resolve_install_cwd(install)
+        if cwd is not None and not cwd.is_dir():
+            continue
+        run_claude_action(claude_path, "plugin", "update", install["id"], "--scope", scope, cwd=cwd)
+        if not install.get("enabled"):
+            run_claude_action(claude_path, "plugin", "enable", install["id"], "--scope", scope, cwd=cwd)
+            lines.append(f"enabled {install['id']} ({scope} scope" + (f", in {cwd}" if cwd else "") + ")")
     return lines
 
 

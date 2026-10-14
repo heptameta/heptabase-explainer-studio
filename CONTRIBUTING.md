@@ -29,7 +29,8 @@ uv run pytest -m "not render and not network"   # the fast tests, as CI runs the
 
 Work on a branch from `main`. To try the change for real, install it as a dev build:
 `uv run python scripts/use_dev_build.py` makes every chat on your computer use your branch's latest commit, and
-`uv run python scripts/use_release.py` goes back to the release. Then make an episode with it, as a user would. The
+`uv run python scripts/use_release.py` goes back to the release. A dev build disables the Heptabase plugin, which
+carries the released skill, until you go back. Then make an episode with it, as a user would. The
 other commands to run before sending are in [AGENTS.md](AGENTS.md#commands).
 
 ## Sending a pull request

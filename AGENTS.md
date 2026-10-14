@@ -78,7 +78,9 @@ When you work in a fork, or in a product or service built on Explainer Studio, r
 
 `uv run python scripts/use_dev_build.py` installs the branch's latest commit as a dev build for every chat on this
 computer, and the CLI, the guide and both pages show its version (`0.1.1.dev13+g9b0e2d4`).
-`uv run python scripts/use_release.py` goes back to the release. Never point Claude Code at the working tree
+`uv run python scripts/use_release.py` goes back to the release. Users get the skill from the Heptabase plugin, and
+Claude Code turns plugins on and off only as a whole, so a dev build disables the Heptabase plugin, its MCP tools too,
+until `use_release.py` enables it again. Never point Claude Code at the working tree
 (`--plugin-dir`, an editable install): a chat would read half-made changes, and its videos could not say which version
 made them. A dev build and the release share `credentials.toml`, `settings.toml`, the programs `setup` installs, and
 series folders.
