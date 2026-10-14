@@ -108,7 +108,7 @@ def check_manimgl() -> Check:
     if probe_result.returncode != 0 or not lines:
         error = (probe_result.stderr.strip().splitlines() or ["no output"])[-1][:300]
         if "manimlib" in error or "No module named" in error:
-            return Check("manimgl", False, error, "run the plugin's install script again (it reinstalls ManimGL)")
+            return Check("manimgl", False, error, "run the skill's install script again (it reinstalls ManimGL)")
         return Check("manimgl", False, f"no GPU adapter: {error}", _format_gpu_fix())
     probe_output = json.loads(lines[-1])
     detail = f"ManimGL {probe_output['manimgl']}, {probe_output['gpu']}"

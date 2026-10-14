@@ -2,31 +2,23 @@
 
     uv run python scripts/release.py              # regenerate everything from the current sources
     uv run python scripts/release.py --check      # exit 1 if anything is out of date (used by the tests)
-    uv run python scripts/release.py --version 0.2.0   # a release: set the version everywhere, turn the
+    uv run python scripts/release.py --version 0.2.0   # a release: set the version, turn the
                                                        # Unreleased headings into it, then regenerate
 
 Sources and what is generated from them:
-- pyproject.toml `version` -> the plugin manifests (Claude Code's and Agent Plugins'). scripts/use_dev_build.py writes
-  its dev build version into the same files of its snapshot (`generate_versioned_files`).
-- explainer_studio/releases.py `RELEASE_REPO` -> the repository install.sh and install.ps1 install the latest release
-  from.
-- pyproject.toml `version` -> the plugin source in the marketplaces (.claude-plugin/marketplace.json for Claude Code,
-  .agents/plugins/marketplace.json for Codex): the plugin folder of the release tag on GitHub, so the marketplaces on
-  main serve the release even after main moves on. A dev build's snapshot reads the plugin from its own folder
-  instead (`generate_marketplace_file`).
-- `--version X.Y.Z` (a release) -> uv.lock (`uv lock`), and CHANGELOG.md's `## [Unreleased]` items go under `## [X.Y.Z] - <today>`, and
-  UPGRADING.md's `## Unreleased` steps, if any, under `## X.Y.Z`.
+- `--version X.Y.Z` (a release) -> pyproject.toml `version`, the only file that carries the version; uv.lock
+  (`uv lock`); CHANGELOG.md's `## [Unreleased]` items go under `## [X.Y.Z] - <today>`, and UPGRADING.md's
+  `## Unreleased` steps, if any, under `## X.Y.Z`. scripts/use_dev_build.py writes its dev build version into its
+  snapshot's pyproject.toml the same way (`generate_versioned_files`).
 - explainer_studio/question_types.py -> the table in references/teaching/question-types.md.
 - explainer_studio/schemas -> the field tables in references/file-formats.md.
 - explainer_studio/cli -> the command reference in docs/cli.md.
-- LICENSE and NOTICE -> copies in plugin/, so the plugin carries them wherever a marketplace installs it.
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime
-import json
 import re
 import subprocess
 import sys
@@ -42,27 +34,16 @@ REPOSITORY_DIR_PATH = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPOSITORY_DIR_PATH))
 
 # paths relative to a source tree: this repository, or a dev build's snapshot of one of its commits
-SKILL_DIR_PATH = Path("plugin") / "skills" / "explainer-studio"
 GUIDE_DIR_PATH = Path("explainer_studio") / "guide"
 PYPROJECT_TOML = Path("pyproject.toml")
-PLUGIN_MANIFEST_FILE_PATHS = (Path("plugin") / ".claude-plugin" / "plugin.json", Path("plugin") / "plugin.json")
-MARKETPLACE_JSON = Path(".claude-plugin") / "marketplace.json"
-CODEX_MARKETPLACE_JSON = Path(".agents") / "plugins" / "marketplace.json"
 CHANGELOG_MD = REPOSITORY_DIR_PATH / "CHANGELOG.md"
 UPGRADING_MD = REPOSITORY_DIR_PATH / "UPGRADING.md"
-INSTALL_SH = SKILL_DIR_PATH / "scripts" / "install.sh"
-INSTALL_PS1 = SKILL_DIR_PATH / "scripts" / "install.ps1"
 QUESTION_TYPES_MD = REPOSITORY_DIR_PATH / GUIDE_DIR_PATH / "references" / "teaching" / "question-types.md"
 FILE_FORMATS_MD = REPOSITORY_DIR_PATH / GUIDE_DIR_PATH / "references" / "file-formats.md"
 CLI_MD = REPOSITORY_DIR_PATH / "docs" / "cli.md"
 
 BEGIN_MARKER_TEMPLATE = "<!-- generated:{name} begin: edit the source, then run scripts/release.py -->"
 END_MARKER_TEMPLATE = "<!-- generated:{name} end -->"
-
-
-def read_project_version(source_tree_dir_path: Path = REPOSITORY_DIR_PATH) -> str:
-    pyproject_text = (source_tree_dir_path / PYPROJECT_TOML).read_text(encoding="utf-8")
-    return re.search(r'^version = "([^"]+)"', pyproject_text, re.MULTILINE).group(1)
 
 
 def replace_block(text: str, name: str, body: str) -> str:
@@ -76,90 +57,10 @@ def replace_block(text: str, name: str, body: str) -> str:
 
 # Generators: each returns {path: new text} --------------------------------------------------------------------------
 def generate_versioned_files(source_tree_dir_path: Path, version: str) -> dict[Path, str]:
-    """Every file of the source tree at `source_tree_dir_path` that carries the version, with `version` written in:
-    pyproject.toml (the source) and plugin.json."""
-    text_by_path_map = {}
+    """The source tree's pyproject.toml, the only file that carries the version, with `version` written in."""
     pyproject_text = (source_tree_dir_path / PYPROJECT_TOML).read_text(encoding="utf-8")
-    text_by_path_map[source_tree_dir_path / PYPROJECT_TOML] = re.sub(r'^version = "[^"]+"', f'version = "{version}"',
-                                                                     pyproject_text, count=1, flags=re.MULTILINE)
-    for manifest_path in PLUGIN_MANIFEST_FILE_PATHS:
-        plugin_manifest = json.loads((source_tree_dir_path / manifest_path).read_text(encoding="utf-8"))
-        plugin_manifest["version"] = version
-        text_by_path_map[source_tree_dir_path / manifest_path] = json.dumps(plugin_manifest, indent=2,
-                                                                            ensure_ascii=False) + "\n"
-    return text_by_path_map
-
-
-# The install scripts: the repository of the releases, and a dev build's default package source -----------------------
-INSTALL_SH_REPO_PATTERN = re.compile(r'^(REPO=")[^"]*(")', re.MULTILINE)
-INSTALL_PS1_REPO_PATTERN = re.compile(r"^(\$Repo = ')[^']*(')", re.MULTILINE)
-INSTALL_SH_SOURCE_PATTERN = re.compile(r'^(SOURCE="\$\{EXPLAINER_STUDIO_SOURCE:-)([^}"]*)(\}")', re.MULTILINE)
-INSTALL_PS1_SOURCE_PATTERN = re.compile(r"^(\$DefaultSource = )'[^']*'", re.MULTILINE)
-
-
-def read_release_repo() -> str:
-    """The GitHub repository (owner/name) of the releases."""
-    from explainer_studio.releases import RELEASE_REPO
-
-    return RELEASE_REPO
-
-
-def generate_install_script_repos(source_tree_dir_path: Path) -> dict[Path, str]:
-    """install.sh and install.ps1 of the source tree at `source_tree_dir_path`, with the releases' repository written
-    in."""
-    repo = read_release_repo()
-    text_by_path_map = {}
-    for path, pattern in ((source_tree_dir_path / INSTALL_SH, INSTALL_SH_REPO_PATTERN),
-                          (source_tree_dir_path / INSTALL_PS1, INSTALL_PS1_REPO_PATTERN)):
-        text = path.read_text(encoding="utf-8")
-        if not pattern.search(text):
-            raise SystemExit(f"cannot find the releases' repository line in {path}")
-        text_by_path_map[path] = pattern.sub(lambda match: match.group(1) + repo + match.group(2), text, count=1)
-    return text_by_path_map
-
-
-def generate_install_scripts(source_tree_dir_path: Path, package_source_dir_path: Path) -> dict[Path, str]:
-    """install.sh and install.ps1 of the source tree at `source_tree_dir_path`, with the folder
-    `package_source_dir_path` as their default package source instead of the release on GitHub (a dev build's
-    snapshot reinstalls itself)."""
-    if any(character in str(package_source_dir_path) for character in '}\n'):
-        raise SystemExit(f"{package_source_dir_path}: a folder whose path has '}}' or a line break cannot be written "
-                         "into install.sh")
-    shell_escaped_source = re.sub(r'([\\"$`])', r"\\\1", str(package_source_dir_path))
-    text_by_path_map = {}
-    text = (source_tree_dir_path / INSTALL_SH).read_text(encoding="utf-8")
-    text_by_path_map[source_tree_dir_path / INSTALL_SH] = INSTALL_SH_SOURCE_PATTERN.sub(
-        lambda match: match.group(1) + shell_escaped_source + match.group(3), text, count=1)
-    text = (source_tree_dir_path / INSTALL_PS1).read_text(encoding="utf-8")
-    text_by_path_map[source_tree_dir_path / INSTALL_PS1] = INSTALL_PS1_SOURCE_PATTERN.sub(
-        lambda match: match.group(1) + "'" + str(package_source_dir_path).replace("'", "''") + "'", text, count=1)
-    return text_by_path_map
-
-
-# The marketplace's plugin source ---------------------------------------------------------------------------------------
-LOCAL_PLUGIN_SOURCE = "./plugin"   # the plugin folder of the source tree the marketplace is in
-
-
-def generate_marketplace_file(source_tree_dir_path: Path, version: str | None) -> dict[Path, str]:
-    """Both marketplace files of the source tree at `source_tree_dir_path`, with the plugin's source: the plugin
-    folder of the release tag v<version> on GitHub, or, when `version` is None (a dev build's snapshot),
-    LOCAL_PLUGIN_SOURCE. Claude Code and Codex spell the two kinds of source differently."""
-    repo = read_release_repo()
-    plugin_source_by_marketplace_file_path_map = {
-        MARKETPLACE_JSON: LOCAL_PLUGIN_SOURCE if version is None else
-        {"source": "git-subdir", "url": repo, "path": LOCAL_PLUGIN_SOURCE.removeprefix("./"), "ref": f"v{version}"},
-        CODEX_MARKETPLACE_JSON: {"source": "local", "path": LOCAL_PLUGIN_SOURCE} if version is None else
-        {"source": "git-subdir", "url": f"https://github.com/{repo}.git", "path": LOCAL_PLUGIN_SOURCE.removeprefix("./"),
-         "ref": f"v{version}"},
-    }
-    text_by_path_map = {}
-    for marketplace_path, plugin_source in plugin_source_by_marketplace_file_path_map.items():
-        marketplace_manifest = json.loads((source_tree_dir_path / marketplace_path).read_text(encoding="utf-8"))
-        for plugin_entry in marketplace_manifest["plugins"]:
-            plugin_entry["source"] = plugin_source
-        text_by_path_map[source_tree_dir_path / marketplace_path] = json.dumps(marketplace_manifest, indent=2,
-                                                                               ensure_ascii=False) + "\n"
-    return text_by_path_map
+    return {source_tree_dir_path / PYPROJECT_TOML: re.sub(r'^version = "[^"]+"', f'version = "{version}"',
+                                                          pyproject_text, count=1, flags=re.MULTILINE)}
 
 
 def generate_release_headings(version: str, release_date: str) -> dict[Path, str]:
@@ -350,19 +251,9 @@ def generate_cli_reference() -> dict[Path, str]:
     return {CLI_MD: replace_block(CLI_MD.read_text(encoding="utf-8"), "cli", "\n".join(lines))}
 
 
-def generate_plugin_license_files() -> dict[Path, str]:
-    """LICENSE and NOTICE copied into plugin/: a marketplace installs only that folder."""
-    return {REPOSITORY_DIR_PATH / "plugin" / name: (REPOSITORY_DIR_PATH / name).read_text(encoding="utf-8")
-            for name in ("LICENSE", "NOTICE")}
-
-
-def generate_files(version: str) -> dict[Path, str]:
+def generate_files() -> dict[Path, str]:
     text_by_path_map: dict[Path, str] = {}
-    for generator in (lambda: generate_versioned_files(REPOSITORY_DIR_PATH, version),
-                      lambda: generate_install_script_repos(REPOSITORY_DIR_PATH),
-                      lambda: generate_marketplace_file(REPOSITORY_DIR_PATH, version),
-                      generate_question_type_table, generate_schema_tables, generate_cli_reference,
-                      generate_plugin_license_files):
+    for generator in (generate_question_type_table, generate_schema_tables, generate_cli_reference):
         text_by_path_map.update(generator())
     return text_by_path_map
 
@@ -379,8 +270,9 @@ def main() -> None:
 
     if is_release and parse_release_version(arguments.version) is None:
         raise SystemExit(f"{arguments.version} is not a release version: X.Y.Z, such as 0.2.0")
-    text_by_path_map = generate_files(arguments.version if is_release else read_project_version())
+    text_by_path_map = generate_files()
     if is_release:
+        text_by_path_map.update(generate_versioned_files(REPOSITORY_DIR_PATH, arguments.version))
         text_by_path_map.update(generate_release_headings(arguments.version, datetime.datetime.now(datetime.UTC).date().isoformat()))
     stale_paths = [path for path, text in text_by_path_map.items()
                    if not path.exists() or path.read_text(encoding="utf-8") != text]

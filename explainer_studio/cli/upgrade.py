@@ -13,7 +13,9 @@ import click
 from ..errors import StudioError
 from .common import print_progress, print_result
 
-PYTHON_VERSION = "3.13"  # the Python the skill's install scripts install the command with
+# The Python the skill's install scripts install the command with. They are in the Heptabase plugin
+# (heptameta/heptabase-agent-plugins): change both together.
+PYTHON_VERSION = "3.13"
 
 
 def find_uv() -> str:

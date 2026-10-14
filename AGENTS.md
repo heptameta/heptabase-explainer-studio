@@ -1,10 +1,11 @@
 # Heptabase Explainer Studio
 
-An open-source (Apache-2.0) coding-agent plugin that turns sources (lecture notes, a book chapter, a paper, a
-codebase) into narrated explainer videos rendered with ManimGL. The plugin carries only a skill
-(`plugin/skills/explainer-studio/`) that installs the command and points the agent to the guide. The Python package
-`explainer_studio` provides the `explainer-studio` CLI, the guide to making videos (`explainer_studio/guide/`, printed
-by `explainer-studio guide`), the `scene_kit` library that scene files import, and the two local pages.
+An open-source (Apache-2.0) command with which a coding agent turns sources (lecture notes, a book chapter, a paper,
+a codebase) into narrated explainer videos rendered with ManimGL. Agents get it through the `explainer-studio` skill
+in the Heptabase plugin (`heptameta/heptabase-agent-plugins`), which installs the command and points the agent to the
+guide. The Python package `explainer_studio` provides the `explainer-studio` CLI, the guide to making videos
+(`explainer_studio/guide/`, printed by `explainer-studio guide`), the `scene_kit` library that scene files import, and
+the two local pages.
 
 ## Building on Explainer Studio
 
@@ -16,6 +17,8 @@ When you work in a fork, or in a product or service built on Explainer Studio, r
   a condition of the license: ask before adding it, and leave it out if they decline.
 - Give the product its own name and logo, replace the Heptabase name and logo where the code shows them, and point
   feedback sharing at the product's own service or turn it off (the README's "Trademarks" lists the places).
+- Agents reach the command through a skill. Heptabase's is in `heptameta/heptabase-agent-plugins` (MIT): to ship your
+  own command, copy it into your own plugin and point its install scripts at your releases.
 
 ## Principles that shape the code
 
@@ -58,7 +61,7 @@ When you work in a fork, or in a product or service built on Explainer Studio, r
 | Before you | Read |
 |---|---|
 | name or rename anything in code, a file format or the CLI | [`naming-convention`](.claude/skills/naming-convention/SKILL.md) |
-| change `plugin/skills/` or `explainer_studio/guide/` | [`skill-and-guide-convention`](.claude/skills/skill-and-guide-convention/SKILL.md) |
+| change `explainer_studio/guide/`, or what the skill relies on: `doctor`, `setup`, `guide`, `upgrade`, the release tags | [`guide-convention`](.claude/skills/guide-convention/SKILL.md) |
 | change teaching behaviour: `explainer_studio/guide/references/` other than `rendering/`, `languages/` and `sources/`, or `explainer_studio/question_types.py` | [`judging-changes`](.claude/skills/judging-changes/SKILL.md), which also says what the pull request must contain |
 | commit, or open a pull request | [`commit-and-pull-request-convention`](.claude/skills/commit-and-pull-request-convention/SKILL.md) |
 | decide on or make a release | [`releasing`](.claude/skills/releasing/SKILL.md) |
@@ -76,12 +79,13 @@ When you work in a fork, or in a product or service built on Explainer Studio, r
 
 ## Trying a change
 
-`uv run python scripts/use_dev_build.py` installs the branch's latest commit as a dev build for every chat on this
-computer, and the CLI, the guide and both pages show its version (`0.1.1.dev13+g9b0e2d4`).
-`uv run python scripts/use_release.py` goes back to the release. Never point Claude Code at the working tree
-(`--plugin-dir`, an editable install): a chat would read half-made changes, and its videos could not say which version
-made them. A dev build and the release share `credentials.toml`, `settings.toml`, the programs `setup` installs, and
-series folders.
+`uv run python scripts/use_dev_build.py` installs the branch's latest commit as a dev build of the command for every
+chat on this computer, and the CLI, the guide and both pages show its version (`0.1.1.dev13+g9b0e2d4`).
+`uv run python scripts/use_release.py` goes back to the release. The skill stays the Heptabase plugin's, and its
+install scripts install the release: if a chat runs one during a dev build (uv missing, ManimGL broken), run
+`use_dev_build.py` again. Never install the working tree as the command (an editable install): a chat would read
+half-made changes, and its videos could not say which version made them. A dev build and the release share
+`credentials.toml`, `settings.toml`, the programs `setup` installs, and series folders.
 
 ## Compatibility
 
@@ -102,5 +106,5 @@ uv run pytest -m "not render and not network"   # the fast tests, as CI runs the
 uv run pytest -m render                         # tests that render with ManimGL and ffmpeg
 uv run ruff check
 uv run python scripts/release.py --check
-uv run python scripts/check_skill_and_guide.py
+uv run python scripts/check_guide.py
 ```

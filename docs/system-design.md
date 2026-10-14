@@ -34,9 +34,9 @@ Four choices shape everything else:
 - **The agent judges; the command enforces a few gates.** The command never decides what to redo. It reuses unchanged
   narration and refuses to go on where skipping a step would cost money or ship a broken video (see
   [Gates](#gates)).
-- **The guide ships with the command.** The plugin's skill installs the command and sends the agent to the guide;
-  `explainer-studio guide` prints the guide of the installed version, so the instructions always match the program that
-  runs them.
+- **The guide ships with the command.** The skill in the Heptabase plugin installs the command and sends the agent to
+  the guide; `explainer-studio guide` prints the guide of the installed version, so the instructions always match the
+  program that runs them.
 - **Pages are optional.** The plan page and the video page let the user see and react, but the agent never waits on
   them: it summarizes in chat, ends its turn, and reads the files when the user comes back.
 
@@ -125,7 +125,7 @@ user's agreement, `feedback share` or the page's share button sends the episode'
 
 ```mermaid
 flowchart LR
-  subgraph plugin [plugin]
+  subgraph plugin [Heptabase plugin]
     skill[SKILL.md, install scripts]
   end
   subgraph package [explainer_studio package]
@@ -145,7 +145,7 @@ flowchart LR
 
 | Part | Responsibility |
 |---|---|
-| `plugin/skills/explainer-studio/` | When to use Explainer Studio, installing the command (`install.sh`, `install.ps1`), then running the guide. |
+| The skill, in the Heptabase plugin (`heptameta/heptabase-agent-plugins`) | When to use Explainer Studio, installing the command (`install.sh`, `install.ps1`), then running the guide. |
 | `explainer_studio/guide/` | How to make the videos: the flow, the workflows, and the references (teaching rules, presenters, languages, subjects, sources, rendering, file formats). |
 | `cli/` | One module per command group. Results go to stdout and progress to stderr, in concise English meant for an agent. |
 | Top-level modules | The logic of each concept: `plan`, `script`, `audience_review`, `narrate`, `deliver`, `feedback`, `feedback_bundle`, `gaps`, `spending`, `cost`, `releases`, `environment`, and so on. |

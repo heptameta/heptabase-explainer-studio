@@ -27,10 +27,14 @@ uv sync
 uv run pytest -m "not render and not network"   # the fast tests, as CI runs them
 ```
 
-Work on a branch from `main`. To try the change for real, install it as a dev build:
-`uv run python scripts/use_dev_build.py` makes every chat on your computer use your branch's latest commit, and
+Work on a branch from `main`. To try the change for real, install the Heptabase plugin as the
+[README](README.md#install) says, then install your change as a dev build: `uv run python scripts/use_dev_build.py`
+makes every chat on your computer use the command from your branch's latest commit, and
 `uv run python scripts/use_release.py` goes back to the release. Then make an episode with it, as a user would. The
 other commands to run before sending are in [AGENTS.md](AGENTS.md#commands).
+
+The skill that installs the command is in the Heptabase plugin. Send changes to it to
+[heptameta/heptabase-agent-plugins](https://github.com/heptameta/heptabase-agent-plugins).
 
 ## Sending a pull request
 

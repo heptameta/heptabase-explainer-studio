@@ -38,7 +38,7 @@ and the sign-offs.
   ```text
   feat: let a video page comment be about the whole episode
   fix: count a subagent's work in the step it is doing
-  feat: install the plugin from the release tag, so a new install between releases gets the release
+  feat: upgrade to the latest release before each episode, so no one stays on the version they first installed
   refactor: move the skill's references into the package as the guide
   chore: release 0.2.0
   ```
@@ -102,7 +102,6 @@ Users install from a store listing and never update plugins, so most would keep 
 each series and episode, without asking the user.
 
 - **`doctor`** shows a newer release as `latest_release`.
-- **The install scripts** install the latest release instead of a version written into them.
 - **`UPGRADING.md`** says what existing series must change; `upgrade` prints the steps of the releases it skipped.
 
 ## Trade-offs
