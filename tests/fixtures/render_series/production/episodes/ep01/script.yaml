@@ -1,0 +1,23 @@
+scenes:
+  - id: dam
+    purpose: 從觀眾熟悉的水壩開始：兩邊水位不同，水想往低處流。
+    beats:
+      - id: water_levels
+        narration_text: 想像一座水壩，左邊水位很高，右邊很低。
+        visual: 標題出現，接著是水壩的圖片。
+      - id: potential_energy
+        narration_text: 高度差就是能量，公式是 E 等於 m g h。
+        visual: 圖片縮到左邊，右邊寫出位能公式。
+      - id: listen
+        narration_text: 先聽一下水車轉動的聲音。
+        visual: 公式框起來，播放一段和弦。
+        pause_duration_seconds: 2
+  - id: heights
+    purpose: 用長條圖比較三個水位，看高度差變大時能量怎麼變。
+    beats:
+      - id: three_levels
+        narration_text: 三個水壩的高度分別是 3、5 和 8 公尺。
+        visual: 三根長條依序長出來，上面寫著數字。
+      - id: higher
+        narration_text: 把最右邊加高到 12 公尺，能拿出來的能量也跟著變多。
+        visual: 最右邊的長條長高，數字變成 12。

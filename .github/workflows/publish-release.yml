@@ -1,0 +1,37 @@
+# Publishes a release when a release pull request is merged: a pyproject.toml version without its tag gets the tag
+# v<version> on the merged commit, and a GitHub Release whose notes are the version's CHANGELOG.md section.
+name: publish-release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^version = "\([0-9][0-9.]*\)"$/\1/p' pyproject.toml | head -n 1)
+          if [ -z "$version" ]; then
+            echo "pyproject.toml has no release version" >&2
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
+            echo "v$version is already released"
+            exit 0
+          fi
+          awk -v heading="## [$version]" \
+            'index($0, heading) == 1 { found = 1; next } found && /^## \[/ { exit } found { print }' \
+            CHANGELOG.md > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "CHANGELOG.md has no ## [$version] section" >&2
+            exit 1
+          fi
+          gh release create "v$version" --target "$GITHUB_SHA" --title "v$version" --notes-file release-notes.md

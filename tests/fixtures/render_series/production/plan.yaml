@@ -1,0 +1,23 @@
+title: 水壩裡的能量
+sources:
+  - sources/notes.md
+language_code: zh-TW
+narration:
+  provider_name: macos-say
+audience:
+  description: |
+    高中生，學過位能的公式，但沒有把它和水壩發電連在一起。
+  unfamiliar_terms: [位能]
+goal: 能用高低差解釋水壩為什麼能發電。
+episodes:
+  - id: ep01
+    title: 水為什麼能推動水車？
+    question: 水壩裡的水，憑什麼能發電？
+    question_type: mechanism
+    presenter_name: theo
+    estimated_duration_seconds: 40
+    taught_terms: [位能]
+    takeaway: 能量藏在高低差裡，水往低處流時才拿得出來。
+    outline:
+      - 水往低處流。
+      - 高低差就是能量。

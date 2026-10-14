@@ -1,0 +1,65 @@
+[project]
+name = "explainer-studio"
+version = "1.0.0"
+description = "Heptabase Explainer Studio: turn teaching materials into narrated explainer videos with a coding agent."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE", "licenses/ManimGL-LICENSE.txt"]
+authors = [{ name = "Heptabase" }]
+requires-python = ">=3.12"
+dependencies = [
+    # ManimGL is pinned to a commit: scene_kit's patches and the skill's pitfalls are written against it.
+    "manimgl @ git+https://github.com/3b1b/manim@fafa083a4fb274bba9cabde0b6e2f50ba6da0622",
+    # ManimGL imports av (video mobjects) without declaring it.
+    "av>=12",
+    "click>=8.1",
+    "pydantic>=2.7",
+    "ruamel.yaml>=0.18",
+    "pyyaml>=6",
+    "filelock>=3.13",
+    "platformdirs>=4",
+    "tomli-w>=1.0",
+    "httpx>=0.27",
+    "numpy>=2",
+    "scipy>=1.13",
+    "pillow>=10",
+    "pypdfium2>=4.30",
+    # scene_kit components
+    "shapely>=2",
+    "rdkit>=2024.3",
+    "verovio>=4",
+    "grandalf>=0.8",
+    "networkx>=3",
+    "pygments>=2.17",
+    # asset playwright record (the Chromium binary is installed by `explainer-studio setup playwright`)
+    "playwright>=1.45",
+]
+
+[project.scripts]
+explainer-studio = "explainer_studio.cli.main:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["explainer_studio"]
+
+[tool.hatch.build.targets.wheel.force-include]
+# `upgrade` and a version change on an episode print the sections an existing series may need
+"UPGRADING.md" = "explainer_studio/UPGRADING.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["render: runs ManimGL and ffmpeg (slow)", "network: calls an external service"]
+addopts = "-m 'not network'"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"

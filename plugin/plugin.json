@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "explainer-studio",
+  "version": "1.0.0",
+  "description": "Heptabase Explainer Studio: turn teaching materials into narrated explainer videos",
+  "author": {
+    "name": "Heptabase"
+  },
+  "license": "Apache-2.0"
+}

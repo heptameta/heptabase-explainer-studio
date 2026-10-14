@@ -1,0 +1,83 @@
+# What .claude/skills/commit-and-pull-request-convention/SKILL.md asks of a pull request that a program can check: the
+# title (it becomes the subject on main), a CHANGELOG.md entry for a feat or fix, and a sign-off on every commit; and
+# that only a release pull request (.claude/skills/releasing/SKILL.md) changes the version, to a new, higher one.
+name: check-pull-request-conventions
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-pull-request-conventions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check the title, the changelog entry and the sign-offs
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          failed=0
+          if ! printf '%s' "$TITLE" | grep -Eq '^(feat|fix|refactor|docs|test|ci|chore): [a-z0-9`].*[^.]$'; then
+            echo "::error::The title must be '<type>: <sentence>': type feat, fix, refactor, docs, test, ci or chore;" \
+              "the sentence starts lowercase and has no trailing period."
+            failed=1
+          fi
+          case "$TITLE" in
+            feat:*|fix:*)
+              if ! git diff --name-only "$BASE_SHA...$HEAD_SHA" | grep -qx 'CHANGELOG.md'; then
+                echo "::error::A feat or fix adds an entry under ## [Unreleased] in CHANGELOG.md."
+                failed=1
+              fi
+              ;;
+          esac
+          for commit in $(git rev-list --no-merges "$BASE_SHA..$HEAD_SHA"); do
+            email=$(git log -1 --format='%ae' "$commit")
+            if ! git log -1 --format='%(trailers:key=Signed-off-by,valueonly)' "$commit" | grep -qiF "<$email>"; then
+              echo "::error::$(git log -1 --format='%h %s' "$commit") has no 'Signed-off-by:' with its author's email" \
+                "($email). Sign it off with 'git commit -s' (CONTRIBUTING.md)."
+              failed=1
+            fi
+          done
+          exit "$failed"
+      - name: Check that only a release pull request changes the version, to a new, higher one
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          read_version() { git show "$1:pyproject.toml" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1; }
+          base_version=$(read_version "$BASE_SHA")
+          version=$(read_version "$HEAD_SHA")
+          title_version=$(printf '%s' "$TITLE" | sed -n 's/^chore: release \([0-9][0-9.]*\)$/\1/p')
+          if [ "$version" = "$base_version" ]; then
+            if [ -n "$title_version" ]; then
+              echo "::error::A release pull request sets the version: run scripts/release.py --version $title_version."
+              exit 1
+            fi
+            exit 0
+          fi
+          if [ "$title_version" != "$version" ]; then
+            echo "::error::Only a release pull request changes the version: title it 'chore: release $version'" \
+              "(.claude/skills/releasing/SKILL.md)."
+            exit 1
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::$version is not a release version (X.Y.Z)."
+            exit 1
+          fi
+          latest=$(git tag -l 'v*' | sed -n 's/^v\([0-9]*\.[0-9]*\.[0-9]*\)$/\1/p' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+          highest=$(printf '%s\n%s\n' "$latest" "$version" | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+          if [ -n "$latest" ] && { [ "$version" = "$latest" ] || [ "$highest" != "$version" ]; }; then
+            echo "::error::$version is not higher than the latest release, $latest."
+            exit 1
+          fi
+          git show "$HEAD_SHA:CHANGELOG.md" | awk -v heading="## [$version]" \
+            'index($0, heading) == 1 { found = 1; next } found && /^## \[/ { exit } found { print }' > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::error::CHANGELOG.md has no ## [$version] section to publish as the release notes."
+            exit 1
+          fi

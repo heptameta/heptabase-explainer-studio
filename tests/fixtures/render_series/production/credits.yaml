@@ -1,0 +1,7 @@
+credits:
+  - asset_file_path: shared/assets/images/dam.png
+    title: Dam diagram (test fixture)
+    author: Explainer Studio tests
+    license: CC0
+    source_url: https://example.org/dam
+    downloaded_at: "2026-10-06T15:02:11+01:00"

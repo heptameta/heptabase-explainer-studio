@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in Explainer Studio did not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security problem, report it privately as `SECURITY.md` describes, instead of opening an issue.
+        Issues are public: leave out your keys, your sources and anything else private.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: >-
+        What you or the agent ran, what happened, and what you expected. Paste the error in full (an unexpected
+        error is a long traceback: paste all of it). It can show paths on your computer; remove any you would
+        rather not share.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `explainer-studio --version`, or "not installed".
+      placeholder: explainer-studio 1.0.0
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor output
+      description: >-
+        The output of `explainer-studio doctor`. It shows paths on your computer; remove any you would rather
+        not share.
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Coding agent and operating system
+      placeholder: Claude Code on macOS 15

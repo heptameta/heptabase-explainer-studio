@@ -1,0 +1,22 @@
+{
+  "name": "heptabase-explainer-studio",
+  "interface": {
+    "displayName": "Heptabase Explainer Studio"
+  },
+  "plugins": [
+    {
+      "name": "explainer-studio",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/heptameta/heptabase-explainer-studio.git",
+        "path": "plugin",
+        "ref": "v1.0.0"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
