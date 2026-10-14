@@ -255,17 +255,17 @@ What a user installs, what it enforces, and how new versions reach them.
 
 ```mermaid
 flowchart LR
-  release -->|marketplace| plugin[plugin, with the skill]
-  plugin -->|install scripts| command
+  plugin[Heptabase plugin, with the skill] -->|install scripts| command
   release -->|explainer-studio upgrade| command
   command -->|explainer-studio guide| guide
   command --> gate
 ```
 
-**plugin**: What a marketplace installs into Claude Code or Codex. It carries only the skill.
+**plugin**: The Heptabase plugin, which users install into Claude Code or Codex. Besides Heptabase's own tools, it
+carries the skill (`heptameta/heptabase-agent-plugins`).
 
-**skill**: What tells the agent to use Explainer Studio: it installs the command and sends the agent to the guide.
-Every installed plugin keeps its copy until the plugin is updated, so it changes rarely.
+**skill**: What tells the agent to use Explainer Studio: it installs the latest release of the command and sends the
+agent to the guide. Every installed plugin keeps its copy until the plugin is updated, so it changes rarely.
 
 **command**: The `explainer-studio` CLI. It does what can be checked or must be exact: production, validation, the
 gates and every call to an outside service.
@@ -277,8 +277,8 @@ and a current render without text too small before delivery. Everything else the
 **guide**: How to make the videos, including the flow the agent follows. It is installed with the command and printed
 by `explainer-studio guide`, so it always matches the version that runs.
 
-**release**: A version tagged on `main`. The marketplaces install the plugin from the latest release, and the agent
-upgrades the command to it before each series and episode; what earlier series must change is in `UPGRADING.md`.
+**release**: A version tagged on `main`. The skill installs the latest release, and the agent upgrades the command
+to it before each series and episode; what earlier series must change is in `UPGRADING.md`.
 
 **dev build**: A version made from a commit that is not released, installed on one computer to develop and test.
 

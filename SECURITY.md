@@ -9,10 +9,11 @@ Please report a vulnerability privately, never in a public issue, pull request o
 - **Without a GitHub account:** email [support@heptabase.com](mailto:support@heptabase.com) with "Explainer Studio
   security" in the subject.
 
-Say what is affected (the `explainer-studio` command, the plan or video page and their local server, the plugin and
-its install scripts, or the server that receives shared feedback), the version (`explainer-studio --version`), how to
-reproduce it, and what an attacker could do with it. We will acknowledge the report, keep you informed while we work
-on it, and credit you when the fix is released, unless you would rather not be named.
+Say what is affected (the `explainer-studio` command, the plan or video page and their local server, the skill's
+install scripts in the Heptabase plugin, or the server that receives shared feedback), the version
+(`explainer-studio --version`), how to reproduce it, and what an attacker could do with it. We will acknowledge the
+report, keep you informed while we work on it, and credit you when the fix is released, unless you would rather not be
+named.
 
 ## Supported versions
 

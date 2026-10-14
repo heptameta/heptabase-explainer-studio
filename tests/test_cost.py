@@ -80,7 +80,7 @@ def test_cost_follows_the_steps_and_leaves_out_waits_copies_and_onlookers(tmp_pa
             result_after_seconds=60)
 
     making = add_planning(Transcript(root)).add_person_message(1800, "looks good, go on")
-    making.add_tool_call(1810, "guide", "Read", {"file_path": "/plugin/skills/explainer-studio/workflow/script.md"},
+    making.add_tool_call(1810, "guide", "Read", {"file_path": "/explainer_studio/guide/workflow/plan-review.md"},
                 result_after_seconds=5)  # shows no step: works toward the next one
     making.add_tool_call(1820, "write", "Write", {"file_path": script_path}, result_after_seconds=10)
     making.add_tool_call(1840, "review", "Bash", {"command": "explainer-studio script validate ep01 && "

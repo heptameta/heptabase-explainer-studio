@@ -1,11 +1,10 @@
-"""Check the conventions of the skill and the guide (`.claude/skills/skill-and-guide-convention/SKILL.md`).
+"""Check the conventions of the guide (`.claude/skills/guide-convention/SKILL.md`).
 
-- The skill and the guide are written in English: text in another script appears only in the guide's
-  `references/languages/<language>.md`.
+- The guide is written in English: text in another script appears only in `references/languages/<language>.md`.
 - The guide's `references/` holds judgment; the steps that run the pages, feedback and setup commands are in
   `workflow/`, so `references/` does not name those commands.
 
-    uv run python scripts/check_skill_and_guide.py
+    uv run python scripts/check_guide.py
 """
 
 from __future__ import annotations
@@ -16,7 +15,6 @@ import unicodedata
 from pathlib import Path
 
 REPOSITORY_DIR_PATH = Path(__file__).resolve().parent.parent
-SKILL_DIR_PATH = REPOSITORY_DIR_PATH / "plugin" / "skills" / "explainer-studio"
 GUIDE_DIR_PATH = REPOSITORY_DIR_PATH / "explainer_studio" / "guide"
 REFERENCES_DIR_PATH = GUIDE_DIR_PATH / "references"
 LANGUAGES_DIR_PATH = REFERENCES_DIR_PATH / "languages"
@@ -44,9 +42,9 @@ def check_is_other_script(character: str) -> bool:
         and not unicodedata.name(character, "").startswith(NOTATION_LETTER_NAME_PREFIXES)
 
 
-def validate_skill() -> list[str]:
+def validate_guide() -> list[str]:
     problems = []
-    for path in sorted([*SKILL_DIR_PATH.rglob("*"), *GUIDE_DIR_PATH.rglob("*")]):
+    for path in sorted(GUIDE_DIR_PATH.rglob("*")):
         if not path.is_file() or path.is_relative_to(LANGUAGES_DIR_PATH):
             continue
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
@@ -61,7 +59,7 @@ def validate_skill() -> list[str]:
 
 
 def main() -> None:
-    problems = validate_skill()
+    problems = validate_guide()
     for problem in problems:
         print(problem)
     sys.exit(1 if problems else 0)

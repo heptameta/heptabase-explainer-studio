@@ -17,6 +17,6 @@ def test_generated_files_are_up_to_date() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_skill_follows_its_conventions() -> None:
-    result = run_script("check_skill_and_guide.py")
+def test_guide_follows_its_conventions() -> None:
+    result = run_script("check_guide.py")
     assert result.returncode == 0, result.stdout
