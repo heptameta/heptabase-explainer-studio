@@ -56,6 +56,8 @@ for planning. They are not what the user needs to read first.
 **Fields for you.** Planning, writing the script and checking it afterwards rely on them, so fill them in too.
 
 6. **`question_type`:** which of the nine types the main question is ([teaching/question-types.md](question-types.md)).
+   Decide it by the `takeaway`, not by how the question is worded: the type is the one whose outcome ("afterwards the
+   viewer can") the takeaway is. "Why" and "how" begin most questions and decide nothing.
    When a concept episode should teach the viewer to apply a tool to new situations, also write `concept_goal: use`
    and word the `question` as "Using X to look at …, what will happen?".
 7. **`takeaway`:** one sentence: what the viewer leaves with. It matches the question type's outcome ("afterwards the
@@ -125,6 +127,9 @@ close. The script is written to this length. A script much shorter than it usual
 2. **Walk back from the endpoints:** find the questions each endpoint needs answered first, and follow the question
    map's prerequisites back until you reach something the viewer already knows. The questions on the way are what to
    teach. What is not on the way gets one sentence, for completeness, or goes into `excluded_topics` with a reason.
+   A distinction the viewer lacks and the main line rests on (a virus and a bacterium, in the story of how a cure was
+   found) is one of these questions, not only a word to teach: put it on the question map as a
+   concept question ([question-types.md](question-types.md#the-neighbours-most-easily-confused)), with its own load.
 3. **Estimate the load:** how much is new to this viewer in each question on the way: unfamiliar terms, people, places
    and years to remember, how many links a causal chain or a proof has (write out each step's links; there are often
    more than they look), and how many pieces of evidence or rebuttals a claim needs (each one is a line the viewer has
@@ -165,7 +170,9 @@ close. The script is written to this length. A script much shorter than it usual
    not proven yet. A viewer should never finish an episode without knowing roughly what the answer looks like. Keep
    related questions together. Each episode opens by recalling the earlier episodes it needs.
 6. **Check:** every endpoint is served by an episode; each episode has one main question, one main line, and a load
-   within capacity; every question comes after the questions it needs; every coverage item has a place.
+   within capacity; every question comes after the questions it needs; every coverage item has a place. Each
+   episode's outline ends on its own answer: what qualifies or undoes that answer belongs to the episode that answers
+   it, and the hand-off only names that episode's question.
 
 When the user set a length, step 4 instead fits the load into that length. A question that does not fit becomes the
 next episode, or goes into `excluded_topics`.
@@ -211,6 +218,11 @@ Every item without a place needs a reason, in `excluded_topics`.
 - The episodes share one spine object: the question changes, the main line does not.
 - Visual state shared across episodes (how an object looked at the end of the previous episode) is fixed in the series
   bible.
+- **An episode by another presenter** (a concept episode between two story episodes, for example) is still this
+  series' episode. It opens where the series stopped and says which of its questions this one answers, and why it
+  comes now; its examples are things the series uses (the objects, people or places the next episodes point at); it
+  ends by handing back to the series' question. The episode after it recalls it in one sentence, with its picture,
+  before using it. The look stays the series' own (each presenter's `style.md`).
 - **Cross-episode devices** (a ledger, a running list, a series map): in the episode where one first appears, build it
   in the body with one concrete moment (say what it is, fill its first cell). The close only fills cells; it never
   introduces a new structure. Later episodes recall the device after the main question is stated, with one sentence
@@ -219,5 +231,8 @@ Every item without a place needs a reason, in `excluded_topics`.
 ## When the script departs from the plan
 
 The plan is the current plan. When writing the script shows that an episode needs something different, update the plan:
-change the `outline`, `takeaway` or `taught_terms` so that later episodes' reviews read what was actually taught.
+change the `outline`, `takeaway` or `taught_terms` so that later episodes' reviews read what was actually taught. A new
+`takeaway` can be another type's outcome (a change of idea becomes "who decided, and why then"): decide the
+`question_type` again by it, and when it changes, plan the episode again with the playbook of that type, and the
+presenter for it, rather than go on writing with the old one.
 Record the departure and why in `decisions.md`; the user hears of it when the episode is delivered.
