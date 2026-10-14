@@ -6,6 +6,16 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- The agent picks an episode's question type by what the viewer takes away, not by how the question is worded, so an
+  episode about how an idea was replaced is no longer told as a mechanism. When writing the script changes the
+  takeaway, it picks the type again and replans the episode with that type's playbook.
+- A distinction the viewer lacks and a story rests on goes into the plan as a concept question of its own, taught before
+  the story uses it, often as its own episode by a presenter who teaches concepts. Such an episode picks up where the
+  series stopped, uses the series' own examples and hands back to it. Each episode's outline now ends on its own answer:
+  what undoes that answer waits for the episode about it.
+
 ## [1.0.0] - 2026-10-14
 
 The first public release.

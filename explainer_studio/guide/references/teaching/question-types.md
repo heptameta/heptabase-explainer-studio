@@ -88,6 +88,13 @@ sources are only a hint. Tell them apart by the sentence the viewer will ask lat
 
 ## The neighbours most easily confused
 
+Decide by what the viewer takes away, not by the words of the question: write the takeaway first, then find the type
+whose "afterwards the viewer can" it is.
+
+- **Mechanism vs conceptual change:** if the viewer leaves with a causal chain in nature or in a machine (why bread
+  rises), it is mechanism. If they leave with an idea people held, where it broke down, and what replaced it at what
+  cost (how people came to accept that continents move), it is conceptual change, even when causal chains are explained
+  on the way. Ask whose story the takeaway sentence tells: a thing's, or an idea's.
 - **Mechanism vs system:** if the answer is a causal chain, it is mechanism; if it is a picture of parts working
   together, it is system. When the viewer should take away what each part is responsible for and who breaks when one is
   removed, it is system, even if the explanation passes through causal chains.
@@ -103,6 +110,11 @@ sources are only a hint. Tell them apart by the sentence the viewer will ask lat
   know how it really happened that one time, and where it could have gone otherwise, it is narrative.
 - **Narrative vs conceptual change:** if the protagonist is an event, it is narrative; if it is an idea, it is
   conceptual change.
+- **A concept under a story:** when following a narrative or a conceptual change needs a distinction the viewer does
+  not have yet (a virus and a bacterium, in the story of how a cure was found), that distinction is a concept
+  question. When the story's main line rests on it, it gets the concept must-haves before the story uses
+  it (two examples, one close non-example, a boundary the viewer judges), in an episode of its own or a segment of this
+  one, from a presenter whose playbook teaches concepts. A label and one example are not enough.
 - **Conceptual change vs perspectives:** if the question is settled and the episode tells how the answer came about, it
   is conceptual change; if it is still unsettled today, it is perspectives.
 - **Argument vs perspectives:** one claim put to the test is argument; several views side by side, with no verdict for
