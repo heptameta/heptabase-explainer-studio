@@ -17,7 +17,7 @@ videos are for and plans a series of episodes, each answering one question. Expl
 animated episodes on your computer, rendered with [ManimGL](https://github.com/3b1b/manim), the engine behind
 3Blue1Brown's videos. Runs on macOS, Windows and Linux.
 
-<a href="#examples"><img alt="Moments from the five demos: rivers light up on a map; a spacetime diagram tilts to a passenger's view; a toy Analytical Engine prints squares and the Fibonacci numbers; a man is held back at an unsafe bridge; an island sinks while its coral reef grows into an atoll." src="https://github.com/user-attachments/assets/054a070c-cdbb-4670-abf1-211d85e6e69e" width="100%"></a>
+<a href="#examples"><img alt="Moments from the five demos: rivers light up on a map; a spacetime diagram tilts to a passenger's view; a toy Analytical Engine prints squares and the Fibonacci numbers; a man is held back at an unsafe bridge; an island sinks while its coral reef grows into an atoll." src="https://github.com/user-attachments/assets/059f54c8-a2d9-4d79-b5cb-144e87a47ce2" width="100%"></a>
 
 <p align="center"><sub>Moments from the five one-minute demos below. <a href="#examples">Watch them with sound</a>.</sub></p>
 
@@ -44,7 +44,7 @@ runs 10 to 20 minutes. The players start muted: turn on the sound to hear the na
 
 <table>
 <tr>
-<td width="45%"><a href="https://github.com/user-attachments/assets/a6f6c483-e23a-4429-82b2-250b9881cc14"><img alt="Theo's cover: a spacetime diagram in which light from two strikes meets on the embankment's level now, while the train's now tilts" src="docs/images/examples/theo.jpg"></a></td>
+<td width="45%"><a href="https://github.com/user-attachments/assets/c20239bb-5a7b-48ee-8208-d2b9418ffbbc"><img alt="Theo's cover: a spacetime diagram in which light from two strikes meets on the embankment's level now, while the train's now tilts" src="docs/images/examples/theo.jpg"></a></td>
 <td>
 <p><b>Theo</b> · Step-by-step derivation</p>
 <p>Rebuilds the idea in pictures, one step at a time, until the result feels inevitable.</p>
@@ -53,7 +53,7 @@ runs 10 to 20 minutes. The players start muted: turn on the sound to hear the na
 </td>
 </tr>
 <tr>
-<td><a href="https://github.com/user-attachments/assets/99a7de02-0fa2-4af7-a6a9-1a3f35dfe3b4"><img alt="Fabian's cover: fifty waggons equal one ship" src="docs/images/examples/fabian.jpg"></a></td>
+<td><a href="https://github.com/user-attachments/assets/8b88e1b6-a334-4a99-80f4-eb28d70cf545"><img alt="Fabian's cover: fifty waggons equal one ship" src="docs/images/examples/fabian.jpg"></a></td>
 <td>
 <p><b>Fabian</b> · Small-world simulation</p>
 <p>Recasts the problem as a small world of players, then shows the outcome emerging from each player’s choices.</p>
@@ -62,7 +62,7 @@ runs 10 to 20 minutes. The players start muted: turn on the sound to hear the na
 </td>
 </tr>
 <tr>
-<td><a href="https://github.com/user-attachments/assets/92331004-ffe2-4b4e-9d2d-175e740847e3"><img alt="Mason's cover: punched cards, two number columns of the store and the mill's gears" src="docs/images/examples/mason.jpg"></a></td>
+<td><a href="https://github.com/user-attachments/assets/4becb1ef-4fe1-49c3-9bde-3f9e5ff9100f"><img alt="Mason's cover: punched cards, two number columns of the store and the mill's gears" src="docs/images/examples/mason.jpg"></a></td>
 <td>
 <p><b>Mason</b> · Hands-on workshop</p>
 <p>Builds a mini version of the idea and tinkers with it until it clicks.</p>
@@ -71,7 +71,7 @@ runs 10 to 20 minutes. The players start muted: turn on the sound to hear the na
 </td>
 </tr>
 <tr>
-<td><a href="https://github.com/user-attachments/assets/59c203b0-96b5-4967-b291-dbb60137a4c7"><img alt="Sophie's cover: two people on a cliff beside a bridge with unsafe planks" src="docs/images/examples/sophie.jpg"></a></td>
+<td><a href="https://github.com/user-attachments/assets/bc0f0f76-b319-470b-bf77-9d8fdaedd5c3"><img alt="Sophie's cover: two people on a cliff beside a bridge with unsafe planks" src="docs/images/examples/sophie.jpg"></a></td>
 <td>
 <p><b>Sophie</b> · Case-based reasoning</p>
 <p>Tweaks a real-life case bit by bit to find what really matters.</p>
@@ -80,7 +80,7 @@ runs 10 to 20 minutes. The players start muted: turn on the sound to hear the na
 </td>
 </tr>
 <tr>
-<td><a href="https://github.com/user-attachments/assets/6dcc6bdb-36c9-410d-8649-7a4eca214679"><img alt="Clio's cover: a coral atoll seen from above" src="docs/images/examples/clio.jpg"></a></td>
+<td><a href="https://github.com/user-attachments/assets/0db93689-9add-4b1a-bc4b-b2bc62e46868"><img alt="Clio's cover: a coral atoll seen from above" src="docs/images/examples/clio.jpg"></a></td>
 <td>
 <p><b>Clio</b> · Historical storytelling</p>
 <p>Tells how it happened, one turning point at a time.</p>
