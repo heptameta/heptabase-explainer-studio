@@ -1,6 +1,7 @@
 # Getting to know the viewer
 
-Contents: [Probe with the sources themselves](#1-probe-with-the-sources-themselves) ·
+Contents: [Probe with the sources themselves](#1-probe-with-the-sources-themselves) ([who will watch](#who-will-watch),
+[how many questions](#how-many-questions), [for a teacher](#for-a-teacher)) ·
 [The audience description](#2-the-audience-description-after-deep-reading) ·
 [The first paragraph and the goal](#3-the-first-paragraph-and-the-goal)
 
@@ -14,6 +15,42 @@ know what they want; they only know whether they understand and whether they lik
 
 Do this before any deep work. Finding out after the script is written that the audience was wrong is the most wasteful
 failure, and the most discouraging one for the user.
+
+### Who will watch
+
+Two kinds of users ask for videos, and they are asked different things:
+
+- **A learner** wants to understand the sources themselves: they are the viewer. Probe them as below.
+- **A teacher** has the knowledge and wants videos for other people: an author with their own paper, a teacher with a
+  textbook, a team with its codebase. The viewer is someone else, and the user knows the sources better than you do.
+  Never test their understanding of their own material: ask about their viewers ([for a teacher](#for-a-teacher)).
+
+Tell which one from the request ("help me understand this paper", "for my students"). When it does not say, the first
+question asks only that: are the videos for you, or for people you teach or share them with? Ask it on its own, so the
+next question can say which kind of questions follow. Record it in the research note. Either way, the plan's audience
+is the viewer.
+
+### How many questions
+
+Next (first, when the request already said who will watch), let the user choose how many questions to answer. The
+question must make sense on its own, to someone who skips the message above it. In the question itself, say what the
+questions will be like (a few real sentences or passages from the sources, asking which ones they follow, or a quick
+guess; for a teacher, questions about their viewers, not about them), what the answers decide (what the videos pass
+over quickly and what they explain from scratch), and only then ask how many. Never ask a bare "How many questions do
+you want to answer?". For example: "Before I read the whole paper, may I ask you a few quick questions about it? I'll
+show you some of its sentences and ask which ones you follow, or ask you to guess something. Your answers decide what
+the video passes over quickly and what it explains from scratch. How many would you like to answer?" Offer four
+options, each with its number of questions and what they cover (never minutes):
+
+- **Start now:** no questions. Infer the viewer from the request and the sources, conservatively (when unsure, assume
+  they forgot), and mark every judgment in the research note as a guess.
+- **A few (2 questions):** round one only.
+- **The usual (4 to 6 questions; recommended):** two or three rounds, as below.
+- **More (up to 9 questions):** the usual, plus the way of telling, familiar worlds and vocabulary.
+
+This asks how many questions, not how deep or how long the videos are: those stay your recommendation after deep
+reading. Whatever they choose, the plan review is where they can still say it does not sound like them. Record the
+choice in the research note.
 
 ### Lessons from calibrating viewers
 
@@ -45,7 +82,7 @@ From real production: one video's audience had to be changed three times before 
    option titles and descriptions, and every sentence quoted from the sources, translated faithfully when the sources
    are in another language (keep a term in the original, in brackets, only when the exact word matters). Each question
    has at most four options, and some allow several answers. Ask one or two questions per round, and choose each round
-   from the reactions to the last. **Stop after two or three rounds.**
+   from the reactions to the last. **Stop at the number of questions they chose** (the usual: two or three rounds).
    - **Original-sentence probe:** pick 3 or 4 sentences from the sources, from easy to hard (short, and faithful to
      the sources: translated into the user's language when they are in another one; a one-line plain paraphrase may
      be added). Ask "Which of these do you understand when you read them?" Several
@@ -121,6 +158,26 @@ From real production: one video's audience had to be changed three times before 
    ([teaching/plan.md](plan.md)). The user feels the load from each episode's length and outline. If it is too much or
    too little, they will say so; then change the capacity and plan again.
 
+### For a teacher
+
+A teacher knows the material and their viewers better than you do. Ask for reactions they can give at a glance, still
+never long texts. Skim the sources the same way, then ask, in this order, as many as they chose:
+
+- **Who watches:** 2 to 4 concrete descriptions of viewers, built from the sources (for example "first-year students
+  who have had calculus but not linear algebra"); several allowed. Never labels like "beginner".
+- **Which they would follow:** the depth probe, 2 or 3 passages on the same key concept at different depths: "Which one
+  would your viewers follow?" No check question after it: they judge others, not themselves.
+- **Where they go wrong:** 3 or 4 common misconceptions on the topic: "Which do your viewers usually hold?" They go into
+  `audience.misconceptions`, with the teacher's answer as the evidence.
+- **What must not be lost:** 3 or 4 key results or points of the sources: "Which must every viewer take away?" They
+  are the plan's endpoints.
+- **Their way of telling** (when more questions were chosen, or two presenters fit): the presenter probe, "Which one
+  would your viewers rather keep listening to?"
+- **Their words** (when needed): when the field names one thing two ways, which one they use.
+
+The vocabulary and the capacity come from these answers; note in the research note that they are the teacher's
+estimate.
+
 ## 2. The audience description (after deep reading)
 
 After reading the sources, write the audience description: `audience.description` in the plan. It is the basis of
@@ -171,4 +228,6 @@ your assumptions are your basis for planning, not something they need to read fi
 - **What you want** (the plan's `goal`): one sentence, the purpose of this learning, in their words. Example: "When I
   read news about the Fed, understand who made the decision and how."
 - No evidence here (it is in the rest of the description), and no jargon, file names or field names.
+- For a teacher, both are about their viewers ("Your students know…"), and the goal is what the viewers should be able
+  to do, in the teacher's words.
 - When they say it doesn't sound like them: fix the description first, then the goal, and plan again when needed.

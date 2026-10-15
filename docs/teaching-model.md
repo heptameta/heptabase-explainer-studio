@@ -16,7 +16,9 @@ rest of the model:
 - **It depends on the viewer.** The same explanation is just right for one person and too fast or too slow for another,
   so every judgment rests on the audience: what the viewer already knows and pictures, which terms are new to them,
   what they wrongly believe, and how much they can take in per episode. The agent finds this out with probes made from
-  the sources themselves, never by asking the user their level.
+  the sources themselves, never by asking the user their level. When the videos are for other people (a teacher's
+  students, a paper's readers), the probes ask the teacher about those viewers instead; the user also chooses how many
+  probes to answer.
 - **What must be achieved is separate from how.** What the viewer can do afterwards, and what an episode must contain
   for that, depend only on the kind of question it answers. How to get there is a teacher's way, and very different
   ways can reach the same outcome.
