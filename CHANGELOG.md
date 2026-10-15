@@ -39,6 +39,8 @@ in [UPGRADING.md](UPGRADING.md).
   arc that should sweep out no longer swells out of a dot: the scene code guide says to move the path with the
   drawing, to rotate about the shape's own centre (for a curved arrow, `arrow.arc.get_arc_center()`) and to sweep
   with `ShowCreation` or an updater, and the screenshot check looks for these.
+- Picking letters out of text in the code font (`text[8:10]`) picks the letters named: the font no longer joins "//"
+  into one glyph, which moved every letter after it one place, so a web address had the wrong letters highlighted.
 
 ## [1.0.0] - 2026-10-14
 
