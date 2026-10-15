@@ -106,8 +106,13 @@ def _read_raw_plan(series: Series) -> tuple[dict[str, Any], list[str], str | Non
     return (raw_plan if isinstance(raw_plan, dict) else {}), validate_plan_document(document), None
 
 
+def _find_user_language_code(raw_plan: dict[str, Any]) -> Any:
+    # The pages speak to the user, so they follow the language the user writes in, not the videos'.
+    return raw_plan.get("user_language_code") or raw_plan.get("language_code")
+
+
 def read_page_language_code(series: Series) -> str:
-    return resolve_page_language_code(_read_raw_plan(series)[0].get("language_code"))
+    return resolve_page_language_code(_find_user_language_code(_read_raw_plan(series)[0]))
 
 
 def _list_episode_ids(raw_plan: dict[str, Any]) -> list[str]:
@@ -195,7 +200,7 @@ def compute_plan_page(series: Series) -> dict[str, Any]:
     except StudioError:
         spent_usd = 0.0
     return {
-        "languageCode": resolve_page_language_code(raw_plan.get("language_code")),
+        "languageCode": resolve_page_language_code(_find_user_language_code(raw_plan)),
         "planVersion": compute_plan_version(_read_bytes_or_empty(series.plan_file_path)),
         "pageDigest": compute_plan_page_digest(series),
         "plan": raw_plan,
@@ -264,7 +269,7 @@ def compute_video_page(series: Series, episode_id: str) -> dict[str, Any]:
                           for delivered_episode_id in _list_episode_ids(raw_plan)
                           if _find_latest_delivery_record(series, delivered_episode_id)]
     return {
-        "languageCode": resolve_page_language_code(raw_plan.get("language_code")),
+        "languageCode": resolve_page_language_code(_find_user_language_code(raw_plan)),
         "pageDigest": compute_video_page_digest(series, episode_id),
         "episode": {"id": episode_id,
                     "title": str(raw_episode_by_id_map.get(episode_id, {}).get("title") or episode_id)},

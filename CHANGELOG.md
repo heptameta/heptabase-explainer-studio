@@ -8,6 +8,13 @@ in [UPGRADING.md](UPGRADING.md).
 
 ### Fixed
 
+- The agent asks every question in the language the user writes in, options and quoted passages included: the guide
+  said to quote the sources' sentences exactly, so a user writing Chinese about an English book was asked in English.
+  The plan's new `user_language_code` keeps the plan and video pages in the user's language when the videos are in
+  another.
+
+### Fixed
+
 - The agent picks an episode's question type by what the viewer takes away, not by how the question is worded, so an
   episode about how an idea was replaced is no longer told as a mechanism. When writing the script changes the
   takeaway, it picks the type again and replans the episode with that type's playbook.

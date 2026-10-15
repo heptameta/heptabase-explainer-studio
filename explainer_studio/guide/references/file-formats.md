@@ -29,7 +29,8 @@ Python file name. Beat ids are unique within an episode.
 title: Linear Algebra from Scratch
 sources:
   - sources/notes.pdf
-language_code: en                 # zh-TW, en, ... ; also the page language
+language_code: en                 # the videos' language: zh-TW, en, ...
+user_language_code: zh-TW         # optional: the language the user writes in, for the pages (default: language_code)
 narration_budget_usd: 20          # omitted: 20; null: no limit; cumulative for the whole series
 narration:                        # required by narrate; fields depend on the provider (below)
   provider_name: elevenlabs
@@ -93,6 +94,7 @@ When the script departs from them, update the plan.
 | `title` | text | yes |
 | `sources` | list of text | yes |
 | `language_code` | text | yes |
+| `user_language_code` | text or null | no |
 | `narration_budget_usd` | number or null | no |
 | `narration` | settings with `provider_name`: `elevenlabs` / `openai` / `voai` / `macos-say` or null | no |
 | `background_music` | settings with `provider_name`: `synthesized-piano` / `none` or null | no |

@@ -10,6 +10,13 @@ This guide comes with the `explainer-studio` command and matches its version. Pa
 `explainer-studio guide <path>`, for example `explainer-studio guide references/teaching/rules.md`. Never edit the
 guide folder: an upgrade replaces it.
 
+## Talking with the user
+
+Talk to the user in the language they write in: every message, every question and every option you offer, and every
+passage you quote from the sources, which you translate. This holds whatever language the sources, this guide or the
+videos are in. The guide's examples are in English; say them in the user's language. When the user writes in another
+language than the videos', write theirs in the plan as `user_language_code`: the pages follow it.
+
 ## How the work is organized
 
 - **Files are the state.** You write the creative files directly: `plan.yaml`, `design.md`, `script.yaml`, scene code,
@@ -100,8 +107,9 @@ to-verify list. Never plan from a summary.
 - Pick a presenter per episode with `references/presenters/README.md`. When the presenter has no playbook for the
   episode's question type (`references/presenters/<presenter>/question-types/<type>.md`), the episode uses a draft
   playbook; say so.
-- Write `production/plan.yaml`, with the audience written from your notes as `references/teaching/audience.md` says, and
-  run `explainer-studio plan validate` until it passes. Write `series-bible.md` (template in
+- Write `production/plan.yaml`, with the audience written from your notes as `references/teaching/audience.md` says
+  (and `user_language_code` when the user writes in another language than the videos'), and run
+  `explainer-studio plan validate` until it passes. Write `series-bible.md` (template in
   `references/file-formats.md`): audience, tone, the fixed concept colour table, recurring devices, term and name
   translations, cover format. Colours never change once set.
 

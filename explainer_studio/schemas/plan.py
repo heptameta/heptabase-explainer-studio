@@ -94,6 +94,8 @@ class Plan(StrictModel):
     title: str = Field(min_length=1)
     sources: list[str] = Field(min_length=1)
     language_code: LanguageCode
+    # the language the user writes in, which the pages use; null: language_code (the videos')
+    user_language_code: LanguageCode | None = None
     narration_budget_usd: float | None = Field(default=20, ge=0)  # cumulative for the series; null: no limit
     narration: NarrationSettings | None = None
     background_music: BackgroundMusicSettings | None = None

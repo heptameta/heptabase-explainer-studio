@@ -41,11 +41,14 @@ From real production: one video's audience had to be changed three times before 
 1. **Skim the sources** (title, abstract, table of contents, section openings, figure captions; no deep reading), just
    enough to pick the probes. When the sources are large and the user chose a part, pick the probes from that part. For
    a paper, first look for a web version ([sources/paper.md](../sources/paper.md)).
-2. **Show the user real things from the sources and ask how they react.** Each question has at most four options, and
-   some allow several answers. Ask one or two questions per round, and choose each round from the reactions to the last.
-   **Stop after two or three rounds.**
-   - **Original-sentence probe:** pick 3 or 4 sentences from the sources, from easy to hard (short, quoted exactly; a
-     one-line plain paraphrase may be added). Ask "Which of these do you understand when you read them?" Several
+2. **Show the user real things from the sources and ask how they react**, in the user's language: the question, the
+   option titles and descriptions, and every sentence quoted from the sources, translated faithfully when the sources
+   are in another language (keep a term in the original, in brackets, only when the exact word matters). Each question
+   has at most four options, and some allow several answers. Ask one or two questions per round, and choose each round
+   from the reactions to the last. **Stop after two or three rounds.**
+   - **Original-sentence probe:** pick 3 or 4 sentences from the sources, from easy to hard (short, and faithful to
+     the sources: translated into the user's language when they are in another one; a one-line plain paraphrase may
+     be added). Ask "Which of these do you understand when you read them?" Several
      answers allowed.
    - **Paraphrase choice** (on the most important sentence): give 3 or 4 plain-language versions: one correct, one or
      two common misunderstandings, and one "I can't really tell". Ask "Which is closest to what went through your mind
