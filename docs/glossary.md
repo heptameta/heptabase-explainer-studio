@@ -304,6 +304,8 @@ Smaller names with a stable meaning, by domain. Each says which abstraction it b
   each one a place where it is handled.
 - **capacity** (audience): How much new content a viewer can take in per episode; planning splits the sources so no
   episode goes past it.
+- **learner**, **teacher** (audience): The two kinds of user. A learner makes the videos for themselves and is the
+  viewer; a teacher (an author, a lecturer, a team) makes them for other people and is asked about those viewers.
 - **probe** (audience): A question the agent asks the user before planning, to learn what the viewer knows and how they
   like to be taught. Among them, the **depth probe** offers passages on one concept at different depths, and the
   **presenter probe** one passage in the way of each presenter whose playbook fits, to help choose between them.

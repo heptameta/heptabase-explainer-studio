@@ -88,9 +88,11 @@ install script (on Windows), run it in the background as the skill says, and car
 
 - If the sources are large (a whole book, many chapters), first ask which part to make, with its table of contents,
   and recommend starting with the first few chapters. A single chapter or paper needs no question.
-- Skim the sources and ask the user how they react to real things from them (two or three rounds), as described in
-  `references/teaching/audience.md`. Estimate their capacity from their reactions. Record all of it in a research note;
-  the audience goes into the plan in step 3, once deep reading has shown what is hard in the sources.
+- Tell who will watch: the user (a learner) or people the user teaches (a teacher); then let the user choose how many
+  questions to answer. Skim the sources and ask how they react to real things from them, as described in
+  `references/teaching/audience.md`; a teacher is asked about their viewers. Estimate their capacity from their
+  reactions. Record all of it in a research note; the audience goes into the plan in step 3, once deep reading has shown
+  what is hard in the sources.
 
 ### 2. Deep reading
 

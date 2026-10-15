@@ -6,15 +6,19 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Added
+
+- Before the first question, the agent tells a learner (the videos are for them) from a teacher (an author or teacher
+  making videos for others), asking when the request does not say. A teacher is asked about their viewers, never
+  tested on their own material. The user then chooses how many questions to answer: none, 2, the usual 4 to 6, or up
+  to 9, told that each answer makes the videos fit better.
+
 ### Fixed
 
 - The agent asks every question in the language the user writes in, options and quoted passages included: the guide
   said to quote the sources' sentences exactly, so a user writing Chinese about an English book was asked in English.
   The plan's new `user_language_code` keeps the plan and video pages in the user's language when the videos are in
   another.
-
-### Fixed
-
 - The agent picks an episode's question type by what the viewer takes away, not by how the question is worded, so an
   episode about how an idea was replaced is no longer told as a mechanism. When writing the script changes the
   takeaway, it picks the type again and replans the episode with that type's playbook.
