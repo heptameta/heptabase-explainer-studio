@@ -41,6 +41,8 @@ in [UPGRADING.md](UPGRADING.md).
   with `ShowCreation` or an updater, and the screenshot check looks for these.
 - Picking letters out of text in the code font (`text[8:10]`) picks the letters named: the font no longer joins "//"
   into one glyph, which moved every letter after it one place, so a web address had the wrong letters highlighted.
+- An end credits page with more assets than fit at full size groups those with the same author and licence into one
+  row ("… and 371 more") instead of shrinking the whole list into an unreadable sliver.
 
 ## [1.0.0] - 2026-10-14
 

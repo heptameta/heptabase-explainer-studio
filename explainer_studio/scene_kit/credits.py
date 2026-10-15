@@ -46,7 +46,7 @@ from .context import get_scene_context
 from .style import LABEL_FONT_SIZE, SMALL_FONT_SIZE, choose_local_text
 
 __all__ = ["EndCreditsEntry", "EndCreditsScene", "get_credits_pages", "get_end_credits_page", "get_heptabase_icon",
-           "load_episode_credits", "resolve_end_credits_entries"]
+           "group_end_credits_entries", "load_episode_credits", "resolve_end_credits_entries"]
 
 # The Heptabase app icon, as in docs/images/logo-light.svg: a white rounded square with the dark H.
 HEPTABASE_ICON_SVG = (
@@ -173,6 +173,25 @@ def _get_asset_rows(entries: list[EndCreditsEntry], get_text) -> VGroup:
     return rows
 
 
+def group_end_credits_entries(entries: list[EndCreditsEntry], row_count: int) -> list[EndCreditsEntry]:
+    """At most row_count rows. When there are more entries, the ones with the same author and licence share a row,
+    named after the first ("Portrait of Euler and 11 more"); groups that still do not fit end in one "N more" row."""
+    if len(entries) <= row_count:
+        return entries
+    names_by_detail_map: dict[str, list[str]] = {}
+    for entry in entries:
+        names_by_detail_map.setdefault(entry.detail, []).append(entry.name)
+    grouped = [EndCreditsEntry(names[0] if len(names) == 1 else
+                               choose_local_text(f"{names[0]} 等 {len(names)} 項", f"{names[0]} and {len(names) - 1} more"),
+                               detail)
+               for detail, names in names_by_detail_map.items()]
+    if len(grouped) <= row_count:
+        return grouped
+    kept = grouped[:max(row_count - 1, 0)]
+    left_count = len(entries) - sum(len(names_by_detail_map[entry.detail]) for entry in kept)
+    return kept + [EndCreditsEntry(choose_local_text(f"另外 {left_count} 項素材", f"{left_count} more assets"), "")]
+
+
 def get_end_credits_page(source_lines: list[str], entries: list[EndCreditsEntry], get_text=None) -> VGroup:
     """The end credits page: a heading, the source lines, the asset rows, and at the bottom "Made with" over the
     Heptabase app icon and name. get_text(text, font_size, isolate) draws text in the series' type (default: Text, the video
@@ -182,18 +201,22 @@ def get_end_credits_page(source_lines: list[str], entries: list[EndCreditsEntry]
     closing = _get_closing(get_text)
     sources = VGroup(*(get_text(line, END_CREDITS_BODY_FONT_SIZE, [line]).set_color(END_CREDITS_NAME_COLOR)
                        for line in source_lines)).arrange(DOWN, aligned_edge=LEFT, buff=0.24)
+    heading = get_text(choose_local_text("素材出處", "Credits"), END_CREDITS_HEADING_FONT_SIZE, [])
+    heading.set_color(GREY_A)
+    closing.to_edge(DOWN, buff=0.85).set_x(0)
+    # the heading and the list sit in the middle of the space above the closing; rows that do not fit at full size
+    # are grouped by author and licence rather than shrunk until nobody can read them
+    top_y, bottom_y = FRAME_HEIGHT / 2 - 0.9, closing.get_top()[1] + 0.6
+    body_height = top_y - bottom_y - heading.get_height() - 0.75
+    rows_height = body_height - (sources.get_height() + 0.55 if len(sources) else 0)
+    entries = group_end_credits_entries(entries, max(int(rows_height // END_CREDITS_ROW_SPACING), 1))
     rows = _get_asset_rows(entries, get_text)
     body = VGroup(*(group for group in (sources, rows) if len(group)))
     if not len(body):
         return VGroup(closing.move_to(ORIGIN))
     body.arrange(DOWN, aligned_edge=LEFT, buff=0.55)
-    heading = get_text(choose_local_text("素材出處", "Credits"), END_CREDITS_HEADING_FONT_SIZE, [])
-    heading.set_color(GREY_A)
-    closing.to_edge(DOWN, buff=0.85).set_x(0)
-    # the heading and the list sit in the middle of the space above the closing; a long list shrinks to fit it
-    top_y, bottom_y = FRAME_HEIGHT / 2 - 0.9, closing.get_top()[1] + 0.6
     body.set_max_width(FRAME_WIDTH - 2.0)
-    body.set_max_height(top_y - bottom_y - heading.get_height() - 0.75)
+    body.set_max_height(body_height)
     body.next_to(heading, DOWN, buff=0.75).set_x(0)
     heading.set_x(0)
     VGroup(heading, body).set_y((top_y + bottom_y) / 2)

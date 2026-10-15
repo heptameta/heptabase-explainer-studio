@@ -170,6 +170,23 @@ def test_end_credits_page_lines_up_the_details_and_closes_with_the_icon_beside_i
     assert len(kit.scene_kit.get_end_credits_page([], [])) == 1  # nothing to list: the closing alone
 
 
+def test_a_long_end_credits_list_is_grouped_by_author_and_licence_instead_of_shrunk(kit):
+    entry = kit.scene_kit.EndCreditsEntry
+    figures = [entry(f"Figure {i}", "An Author · Used with permission") for i in range(1, 373)]
+    portrait = entry("Portrait of Euler", "Jakob Emanuel Handmann · Public domain")
+    short_page = kit.scene_kit.get_end_credits_page(["An essay"], [figures[0], portrait])
+    long_page = kit.scene_kit.get_end_credits_page(["An essay"], [*figures, portrait])
+    short_source, long_source = short_page[1][0], long_page[1][0]
+    assert long_source.get_height() == pytest.approx(short_source.get_height())  # nothing shrank
+    assert len(long_page[1][1]) == 2
+    grouped = kit.scene_kit.group_end_credits_entries([*figures, portrait], 8)
+    assert [(item.name, item.detail) for item in grouped] == [
+        ("Figure 1 and 371 more", "An Author · Used with permission"), ("Portrait of Euler", portrait.detail)]
+    many_authors = [entry(f"Map {i}", f"Mapmaker {i} · CC BY 4.0") for i in range(20)]
+    capped = kit.scene_kit.group_end_credits_entries(many_authors, 8)
+    assert len(capped) == 8 and capped[-1].name == "13 more assets"
+    assert kit.scene_kit.group_end_credits_entries(many_authors[:3], 8) == many_authors[:3]
+
 def test_curves_sampled_at_once_have_manimgl_s_points(tmp_path):
     assert_same_points_as_manimgl(tmp_path, """
         import sys
