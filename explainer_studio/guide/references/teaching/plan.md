@@ -197,7 +197,7 @@ outline):
 - the foil (the familiar "standard account" to push against);
 - the spine object;
 - the acts, each opened by a question;
-- the key-point labels (at most three);
+- the key-point labels (at most three, each a sentence the viewer can repeat);
 - the closing reframe.
 
 The skeleton follows the episode's playbook. For a short episode (6 minutes or less), use the short skeleton in the

@@ -139,7 +139,10 @@ in the argument, leaving the picture used so far) where you could not say in one
 established and why the next part is being shown; a turn that ends without the revised claim said aloud; pieces that \
 are the same thing but are not said to be when the second one appears; or the episode's main question or main \
 picture swapped for another one midway. A sentence only written on screen does not count as said.
-16. Anything from this episode's must-haves (above) that the scenes you read leave out or only assert."""
+16. Anything from this episode's must-haves (above) that the scenes you read leave out or only assert.
+17. A line meant to sum up (a recap, a key-point label, a slogan, the line that closes a step, the close) that, heard \
+alone, names nothing you could point at or repeat: only wordplay or abstract words; or a numbered label ("the second \
+key idea", "the third way") whose earlier members you could not name at that moment."""
 
 
 def _write_prompt_file(series: Series, episode_id: str, text: str) -> Path:
@@ -263,7 +266,7 @@ def prepare_audience_review_prompt(series: Series, episode_id: str,
         "## Your reply\n\nReply with only this YAML, nothing before or after it:\n\n```yaml\n" + SCRIPT_REPLY_TEMPLATE
         + "\n```\n\n"
         "Kinds:\n"
-        "- `lost`: you lost the thread or stopped following there; or it is a problem of type 14 or 15; or it is a "
+        "- `lost`: you lost the thread or stopped following there; or it is a problem of type 14, 15 or 17; or it is a "
         "problem of type 1 that the reasoning depends on.\n"
         "- `wrong`: it is inaccurate or overclaimed (type 6).\n"
         "- `minor`: anything else.\n\n"

@@ -125,11 +125,18 @@ Grouped by what they do.
 
 ### IV. Pacing
 
-26. **Key-point labels:** "This is the first key idea." At most 3 per video.
+26. **Key-point labels:** at most 3 per video, and only for ideas the episode has already shown to matter. Each label
+    says its idea in concrete words the viewer can repeat ("Key idea two: a vaccine trains the body on a harmless
+    copy"), never the number alone. Say how many there are at the first one, and at each later one recall the earlier
+    ones in a phrase: minutes apart, "the second key idea" alone leaves the viewer wondering what the first was. The
+    same goes for any numbered set (three escapes, two rules): say how many and what each one is, and keep them on
+    screen as a list that fills in.
 27. **The step-back causal recap:** "So far we know: … because … so … What's still missing is …". Recap the
     because-chain, not a list of topics.
 28. **Compress into one slogan first, then apply it:** first say "the price is where the two lines cross", then apply
-    it case by case.
+    it case by case. The slogan names the concrete things it compresses (the two lines, the price). A line that works
+    only by wordplay, with nothing in it the viewer could point at ("it's not about speed, it's about rhythm"), sounds
+    like a summary and says nothing: say the concrete version, rhythm and parallels included.
 29. **Milestones and reassurance:** "If you stop here, you already have the main idea"; "The next part trips most
     people up; that's normal."
 30. **The contract:** the roadmap is presented as a promise; a deferred payoff says "I'll explain in a moment"; skipping
@@ -183,6 +190,8 @@ Related devices:
 - **The causal-chain punchline:** "So this is the real reason ___", plus a claim of inevitability.
 - **A reframing reflection:** what looked like a detail turns out to be the whole story; the question we started with
   was not quite the right one, and here is the better one; an old idea still hides questions nobody has asked yet.
+- The punchline and the reframe name the episode's concrete things: the objects, numbers and people the viewer saw.
+  "The question was never X but Y" says nothing until Y is something the viewer has watched happen.
 - **Structural rhyme:** close with a challenge problem of your own, echoing a challenge from the story the video
   told.
 - **The hand-off:** preview the next chapter; split one step off into another video.
@@ -194,7 +203,8 @@ Related devices:
 ### IX. Tone
 
 - Second person dominates; "you and I", "together" as company.
-- Long cumulative sentences with short punches between them ("Strange." "But true.").
+- Long cumulative sentences with short punches between them ("Strange." "But true."). A short punch follows a concrete
+  sentence; it never stands in for the conclusion.
 - A moderate amount of softeners ("a little", "to some extent").
 - Signposts that tell the viewer where they are: what this part is for, a step back to the whole picture, what is set
   aside for now, a short wrap-up before moving on.
@@ -319,7 +329,8 @@ a burden to an expert; keep the expert version short)
 **Structure**
 
 - [ ] 3 to 5 acts, each opened by a question?
-- [ ] 1 to 3 key-point labels?
+- [ ] At most 3 key-point labels, each saying its idea in concrete words, the first saying how many?
+- [ ] Every recap, slogan, label and the close, heard alone, names something concrete the viewer could repeat?
 - [ ] The recaps are causal?
 - [ ] Every promise is listed and kept?
 - [ ] A milestone after the hardest part?

@@ -26,6 +26,11 @@ in [UPGRADING.md](UPGRADING.md).
   the story uses it, often as its own episode by a presenter who teaches concepts. Such an episode picks up where the
   series stopped, uses the series' own examples and hands back to it. Each episode's outline now ends on its own answer:
   what undoes that answer waits for the episode about it.
+- Theo's recaps, slogans, key-point labels and closes name the episode's concrete things instead of sounding like a
+  summary through wordplay alone. A key-point label says its idea, and the first says how many there are, so "the
+  second key idea" minutes later no longer leaves the viewer wondering what the first was. The script audience review
+  counts an empty summary line, or a numbered label whose earlier members the viewer cannot name, as a place the
+  viewer is lost.
 
 ## [1.0.0] - 2026-10-14
 
