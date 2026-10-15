@@ -424,6 +424,15 @@ CJK glyphs, `\|` in formulas, the default font); write those as usual.
 - A `NumberLine` (including `get_timeline`) drawn with `ShowCreation(line)` and `FadeIn(line.numbers)` in the same play
   loses its numbers. Use `FadeIn(line)`.
 - Inside an inset, line widths do not shrink with the content: a tick mark becomes a blob. Draw insets' marks thinner.
+- A path you send something along (`MoveAlongPath`, `flow_along`) stays where it was made when the drawing moves or
+  shrinks. Put the path in the group you move (with `set_stroke(opacity=0)`), or build it again from the drawn wires
+  after they move. Moving a separate copy by hand to line it up again puts the dot beside the wire.
+- `Rotate(mobject, angle, about_point=p)` spins something in place only when `p` is its own centre; anywhere else it
+  sends it round in a circle. An arc's centre is `arc.get_arc_center()`. The arc of `get_curved_arrow(a, b, angle)` is
+  centred wherever the two points and the angle put it, not at a point beside them that you computed.
+- `Transform` from a tiny arc or line to a long one does not sweep along it: every point moves at once, so it swells
+  out of a dot. To sweep it, draw the full shape with `ShowCreation`, or rebuild it each frame from the angle reached
+  (`UpdateFromAlphaFunc`).
 
 **3D**
 

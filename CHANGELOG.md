@@ -35,6 +35,10 @@ in [UPGRADING.md](UPGRADING.md).
   is for, a reminder, one case of what a claim means) is fixed with its own beat even when it is marked minor, instead
   of being kept because a minor fix may not add a sentence. The reviewer counts a skipped causal step the reasoning
   depends on as a place it is lost.
+- A dot sent along wires stays on them after the drawing moves or shrinks, an arrow spun in place stays in place, and an
+  arc that should sweep out no longer swells out of a dot: the scene code guide says to move the path with the
+  drawing, to rotate about the shape's own centre (for a curved arrow, `arrow.arc.get_arc_center()`) and to sweep
+  with `ShowCreation` or an updater, and the screenshot check looks for these.
 
 ## [1.0.0] - 2026-10-14
 
