@@ -267,7 +267,7 @@ def prepare_audience_review_prompt(series: Series, episode_id: str,
         + "\n```\n\n"
         "Kinds:\n"
         "- `lost`: you lost the thread or stopped following there; or it is a problem of type 14, 15 or 17; or it is a "
-        "problem of type 1 that the reasoning depends on.\n"
+        "problem of type 1 or 2 that the reasoning depends on.\n"
         "- `wrong`: it is inaccurate or overclaimed (type 6).\n"
         "- `minor`: anything else.\n\n"
         "At most 15 findings, most serious first. Use scene and beat ids exactly as written above. Put every "

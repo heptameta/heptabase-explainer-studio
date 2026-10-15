@@ -311,7 +311,10 @@ want to keep watching (`most_engaging_beat_id`). Keep that line when fixing; cut
 - Where the reviewer thought something wrong, fix it starting from what it thought at that moment.
 - `minor`: fix only by deleting words or moving words already in the script. Add no sentence, and do not replace a
   sentence with a new one (a new summary is also a new sentence). If it cannot be fixed that way, keep it
-  (`action: kept`).
+  (`action: kept`). This is for wording and polish. A finding that says the reasoning is missing something is a
+  missing link, however it is marked: a premise the viewer was never given, what a piece of evidence is there to
+  answer, a reminder, or one case of what a claim means, worked on what the episode already shows. Fix it as the next
+  item says, with its own beat. Never keep it because a `minor` fix may not add a sentence.
 - The reviewer got lost, or a link was missing: give the missing link its own beat (say the premise or the conclusion,
   then pause). Do not squeeze it into the existing sentence. A missing reminder of something earlier goes before the
   line that relies on it, not after (principle 11). Do not answer it with a denial, an abstract summary or a new

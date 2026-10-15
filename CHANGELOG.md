@@ -31,6 +31,10 @@ in [UPGRADING.md](UPGRADING.md).
   second key idea" minutes later no longer leaves the viewer wondering what the first was. The script audience review
   counts an empty summary line, or a numbered label whose earlier members the viewer cannot name, as a place the
   viewer is lost.
+- A script audience review finding that says the reasoning is missing something (a premise, what a piece of evidence
+  is for, a reminder, one case of what a claim means) is fixed with its own beat even when it is marked minor, instead
+  of being kept because a minor fix may not add a sentence. The reviewer counts a skipped causal step the reasoning
+  depends on as a place it is lost.
 
 ## [1.0.0] - 2026-10-14
 
