@@ -1,9 +1,7 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
-  <img alt="Heptabase Explainer Studio" src="docs/images/logo-light.svg" width="400">
-</picture>
+<img alt="Heptabase Explainer Studio" src="docs/images/logo-light.svg#gh-light-mode-only" width="400">
+<img alt="Heptabase Explainer Studio" src="docs/images/logo-dark.svg#gh-dark-mode-only" width="400">
 
 **Turn any material into explainer videos, with your coding agent.**
 
@@ -23,10 +21,10 @@ animated episodes on your computer, rendered with [ManimGL](https://github.com/3
 
 ## How it works
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/how-it-works-dark.svg">
-  <img alt="Your source goes to your coding agent, which designs the teaching; Explainer Studio produces the video on your computer; your comments on the video go back to the agent." src="docs/images/how-it-works-light.svg">
-</picture>
+<p>
+<img alt="Your source goes to your coding agent, which designs the teaching; Explainer Studio produces the video on your computer; your comments on the video go back to the agent." src="docs/images/how-it-works-light.svg#gh-light-mode-only">
+<img alt="Your source goes to your coding agent, which designs the teaching; Explainer Studio produces the video on your computer; your comments on the video go back to the agent." src="docs/images/how-it-works-dark.svg#gh-dark-mode-only">
+</p>
 
 ## Why the videos work
 
@@ -191,10 +189,8 @@ included:
 - **In text:** `Built with [Heptabase Explainer Studio](https://github.com/heptameta/heptabase-explainer-studio)`
 - **As a badge,** which follows the reader's light or dark theme on GitHub:
 
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/built-with-dark.svg">
-    <img alt="Built with Heptabase Explainer Studio" src="docs/images/built-with-light.svg">
-  </picture>
+  <img alt="Built with Heptabase Explainer Studio" src="docs/images/built-with-light.svg#gh-light-mode-only">
+  <img alt="Built with Heptabase Explainer Studio" src="docs/images/built-with-dark.svg#gh-dark-mode-only">
 
   <details>
   <summary>The badge's HTML</summary>
