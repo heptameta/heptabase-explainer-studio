@@ -21,3 +21,17 @@ def test_every_locale_has_the_same_keys_and_placeholders() -> None:
 def test_page_language_code_follows_the_plan_language() -> None:
     assert [resolve_page_language_code(code) for code in ("zh-TW", "zh-Hant-HK", "zh-tw", "zh-CN", "ja", None)] == \
         ["zh-TW", "zh-TW", "zh-TW", "en", "en", "en"]
+
+
+def test_the_pages_speak_the_users_language_when_it_differs_from_the_videos(tmp_path) -> None:
+    from delivered_series import create_series
+
+    from explainer_studio.web.pages import compute_plan_page, read_page_language_code
+
+    series = create_series(tmp_path / "series", should_render=False)
+    assert read_page_language_code(series) == "zh-TW"  # no user language: the videos' language
+    text = series.plan_file_path.read_text(encoding="utf-8")
+    text = text.replace("language_code: zh-TW\n", "language_code: zh-TW\nuser_language_code: en\n", 1)
+    series.plan_file_path.write_text(text, encoding="utf-8")
+    assert read_page_language_code(series) == "en"  # the video page reads it too
+    assert compute_plan_page(series)["languageCode"] == "en"

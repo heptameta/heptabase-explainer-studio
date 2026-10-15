@@ -1,8 +1,8 @@
-"""Page text in the series language: `locales/<language_code>.json` and `translate()`.
+"""Page text in the user's language (the plan's `user_language_code`, else its `language_code`):
+`locales/<language_code>.json` and `translate()`.
 
-Pages follow the plan's `language_code`: zh-TW and zh-Hant (any case, any suffix) read Traditional Chinese,
-everything else English. Both locale files carry the same keys; `{name}` placeholders are filled by `translate()` here
-and in the pages' JS.
+zh-TW and zh-Hant (any case, any suffix) read Traditional Chinese, everything else English. Both locale files carry
+the same keys; `{name}` placeholders are filled by `translate()` here and in the pages' JS.
 """
 
 from __future__ import annotations

@@ -36,9 +36,9 @@ new terms per episode) in `plan.yaml` and say so.
 ## Sharing feedback with the Heptabase Explainer Studio team
 
 Share only with the user's explicit agreement, given at that moment. The video page's Send feedback button is the
-usual way; ask in chat only when an episode has feedback worth sending. When the series' language reference gives its own wording
-for what you say below (`references/languages/<language>.md`, section 11), use that instead; otherwise say it in the
-series language.
+usual way; ask in chat only when an episode has feedback worth sending. When the language reference of the user's
+language gives its own wording for what you say below (`references/languages/<language>.md`, section 11), use that
+instead; otherwise say it in the user's language.
 
 - The first time you deliver an episode in a series, tell the user in one sentence that the video page can send their
   feedback to the team:
