@@ -1,4 +1,5 @@
-"""A small series whose first episode is rendered and ready to deliver, for the deliver, feedback and page tests.
+"""A small series whose first episode is rendered, with its cards, and ready to deliver, for the deliver, feedback
+and page tests.
 
 The render is fake but consistent: a 12.5 s test-pattern MP4 with a tone, made with ffmpeg, and the timeline,
 subtitles, script and script audience review that match it.
@@ -168,6 +169,31 @@ def write_script_review(series: Series, episode_id: str = "ep01") -> None:
         "    findings: []\n", encoding="utf-8")
 
 
+# cards that fit the render: deliver checks them
+NOTES = {
+    "parts": [{"title": "兩次移動等於一支箭頭", "segments": ["hook"]},
+              {"title": "首尾相接就是加法", "segments": ["tip_to_tail"]}],
+    "segments": {
+        "hook": {"title": "兩次移動", "summary": "往東三步再往北兩步，合起來是一支斜箭頭。", "key_frame": "one_arrow",
+                 "cards": [{"id": "moves_add", "title": "兩次移動合起來，等於從起點直接走到終點。",
+                            "points": ["往東三步再往北兩步，==終點只跟兩次移動有關==。",
+                                       {"text": "合起來的移動是一支斜箭頭。", "frame": "one_arrow",
+                                        "caption": "斜的箭頭連起點和終點"}],
+                            "leads_to": ["tip_to_tail"]}]},
+        "tip_to_tail": {"title": "首尾相接", "summary": "第二支箭頭的尾巴接上第一支的頭。", "key_frame": "sum",
+                        "cards": [{"id": "tip_to_tail", "title": "**向量加法**就是把箭頭首尾相接。", "color": "green",
+                                   "points": [{"text": "畫法有兩步：", "points": ["尾巴接頭", "從第一支的尾畫到第二支的頭"]}]}]},
+    },
+}
+
+
+def write_notes(series: Series, notes: dict = NOTES, episode_id: str = "ep01") -> None:
+    import yaml
+
+    series.get_episode_paths(episode_id).notes_file_path.write_text(yaml.safe_dump(notes, allow_unicode=True),
+                                                                    encoding="utf-8")
+
+
 def create_series(root: Path, should_render: bool = True) -> Series:
     """The series at `root`, with ep01 written, reviewed and (unless `should_render` is False) rendered."""
     import yaml
@@ -183,4 +209,5 @@ def create_series(root: Path, should_render: bool = True) -> Series:
     if should_render:
         write_render(series)
         write_script_review(series)
+        write_notes(series)
     return series

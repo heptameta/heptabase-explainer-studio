@@ -6,6 +6,20 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Added
+
+- The video page has two views next to theater mode. **Chapters** shows the episode's parts, each a key frame beside
+  its segments with their core ideas; choosing a segment plays it, and each opens into its cards. **Whiteboard** puts
+  every delivered episode's cards on one whiteboard for the series, drawn like a Heptabase whiteboard: a section per
+  episode holding a section per part, a column per segment, arrows between the cards, panned and zoomed, and a card
+  opened by a click to scroll through and copy. A card is one claim, with numbered points that support it and their
+  key phrases highlighted, written so that a viewer who has not watched learns the episode from the cards and one who
+  has recalls it; copying puts it into a notes app as rich text with its pictures.
+- The agent writes an episode's cards in `production/episodes/<episode>/notes.yaml` while it makes the scenes, and
+  `deliver` refuses an episode without cards that fit its render, so both views are there from the moment of delivery.
+  `explainer-studio notes check <episode>` checks the cards alone. Episodes delivered before get cards when the user
+  asks for them.
+
 ## [1.1.1] - 2026-10-16
 
 ### Fixed

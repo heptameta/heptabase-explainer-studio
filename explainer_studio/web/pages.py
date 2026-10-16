@@ -18,6 +18,7 @@ from typing import Any
 
 from .. import __version__, presenters, question_types
 from ..background_music_providers import PROVIDER_BY_NAME_MAP as BACKGROUND_MUSIC_PROVIDER_BY_NAME_MAP
+from ..chapters import compute_page_board, compute_page_chapters
 from ..cost import (
     build_work_totals,
     check_has_episode_work,
@@ -239,7 +240,12 @@ def convert_comment_anchor_to_page_json(anchor: CommentAnchor) -> dict[str, Any]
 
 def compute_video_page_digest(series: Series, episode_id: str) -> str:
     latest_delivery = find_latest_delivery(series, episode_id)
+    raw_plan, _, _ = _read_raw_plan(series)
+    # every episode's notes: the series shares one whiteboard
+    notes_stats = [_read_stat(series.get_episode_paths(plan_episode_id).notes_file_path)
+                   for plan_episode_id in _list_episode_ids(raw_plan)]
     return _compute_digest(_read_bytes_or_empty(series.get_episode_paths(episode_id).feedback_file_path),
+                           *notes_stats,
                            compute_plan_version(_read_bytes_or_empty(series.plan_file_path)),
                            _read_stat(series.gaps_file_path),
                            latest_delivery["latest_delivery_record"].delivered_at if latest_delivery else None,
@@ -290,6 +296,9 @@ def compute_video_page(series: Series, episode_id: str) -> dict[str, Any]:
         "isDevModeOn": check_is_dev_mode_on(),
         "hasUnsharedFeedback": resolve_unshared_items(feedback, load_gaps(series)).has_feedback,
         "episodes": delivered_episodes,
+        # the chapters view, when notes.yaml fits the delivered video, and the series' whiteboard of every episode's cards
+        "chapters": compute_page_chapters(series, episode_id),
+        "board": compute_page_board(series, [(episode["id"], episode["title"]) for episode in delivered_episodes]),
     }
 
 

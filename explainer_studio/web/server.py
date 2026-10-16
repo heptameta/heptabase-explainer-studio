@@ -26,6 +26,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from .. import __version__
+from ..chapters import find_frame_file_path, find_handout_image_file_path
 from ..errors import StudioError
 from ..feedback import add_comment, delete_comment, edit_comment, load_feedback, set_survey_answer
 from ..feedback_bundle import resolve_unshared_items, share_feedback
@@ -43,7 +44,8 @@ MAX_BODY_BYTES = 1_000_000
 CHUNK_BYTES = 256 * 1024
 CONTENT_TYPE_BY_SUFFIX_MAP = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
                               ".woff2": "font/woff2", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8",
-                              ".png": "image/png", ".mp4": "video/mp4", ".vtt": "text/vtt; charset=utf-8"}
+                              ".png": "image/png", ".mp4": "video/mp4", ".vtt": "text/vtt; charset=utf-8",
+                              ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}
 SECURITY_HEADER_VALUE_BY_NAME_MAP = {
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
@@ -310,6 +312,18 @@ class PageRequestHandler(BaseHTTPRequestHandler):
                 except StudioError as error:
                     return self._send_json(502, {"code": "not_sent", "message": error.why})
                 self._send_json(200, {"isSent": bool(shared_items)})
+            case ("GET" | "HEAD"), ["media", episode_id, "frames", frame_name] if frame_name.endswith(".jpg"):
+                # a beat's frame in the latest delivered video, for the chapters view
+                frame_file_path = find_frame_file_path(series, episode_id, frame_name.removesuffix(".jpg"))
+                if frame_file_path is None:
+                    return self._send(404, b"not found", "text/plain")
+                self._send_file(frame_file_path, "image/jpeg")
+            case ("GET" | "HEAD"), ["media", episode_id, "handout-images", *asset_path_parts] if asset_path_parts:
+                # a credited picture a handout shows
+                image_file_path = find_handout_image_file_path(series, episode_id, "/".join(asset_path_parts))
+                if image_file_path is None:
+                    return self._send(404, b"not found", "text/plain")
+                self._send_file(image_file_path)
             case ("GET" | "HEAD"), ["media", episode_id, media_name]:
                 # video.mp4, cover.png or subtitles.<language code>.vtt of the latest delivery
                 latest_delivery = pages.find_latest_delivery(series, episode_id)
