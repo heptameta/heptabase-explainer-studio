@@ -214,7 +214,7 @@ self.play(Transform(curve, axes.get_graph(lambda x: 0.05 * x ** 3, x_range=(0, 4
 | `get_array(values)` | an array of boxes with indices | `.cells[i]` = (box, value), `.indices[i]`; `swap_cells(array, i, j)` |
 | `get_pointer(target, label="", direction=UP)` | an arrow pointing at a cell (`i`, `head`) | move it by `Transform` to a new pointer |
 | `get_linked_list(values)`, `get_stack(values)` | a singly linked list; a vertical stack (top is last) | `.nodes[i]`, `.links[i]`; `.elements[i]` |
-| `get_curved_arrow(start, end, angle=-PI / 3)` | a thin curved arrow between two objects ("attends to", "affects") | `.arc`, `.tip`; draw `ShowCreation(arrow.arc)` then `FadeIn(arrow.tip)`. Mobjects are joined at their centres: pass points such as `a.get_top()` to land on an edge |
+| `get_curved_arrow(start, end, angle=-PI / 3)` | a thin curved arrow between two objects ("attends to", "affects") | `.arc`, `.tip`; draw `ShowCreation(arrow.arc)` then `FadeIn(arrow.tip)`. Mobjects are joined at their centres: pass points such as `a.get_top()` to land on an edge. To spin it in place: `Rotate(arrow, angle, about_point=arrow.arc.get_arc_center())` |
 
 ```python
 d = get_graph_diagram(["user", ("api", "API server"), ("db", "Database"), "cache"],

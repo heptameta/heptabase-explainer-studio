@@ -22,7 +22,7 @@ Preview the scene you are working on (`--scenes`); after fixing, preview it agai
 
 | Screenshot sheet | Contents | Look at it for |
 |---|---|---|
-| `every-2s` (preview) | a frame every 2 seconds, labelled with its time, 12 to a screenshot sheet (4 × 3, 480 px wide) | motion and layout over time: things appearing, leaving, crowding, a stretch where nothing happens |
+| `every-2s` (preview) | a frame every 2 seconds, labelled with its time, 12 to a screenshot sheet (4 × 3, 480 px wide) | motion and layout over time: things appearing, leaving, crowding, a stretch where nothing happens; something that should stay on its line or in its place (a dot running along a wire, an arrow spinning) drifting off it, or a shape that should sweep out swelling from a dot instead |
 | `by-beat` (preview) | the frame at the end of each beat, with the beat id, the time and the line printed under it, 9 to a screenshot sheet (3 columns, 420 px) | whether the picture shows what the line says |
 | `every-6s` (render) | a frame every 6 seconds of the whole episode | the whole episode's rhythm, seams between scenes, repeats |
 | `by-beat` (render) | the end of every beat, 6 to a screenshot sheet (2 columns, 600 px) | the same as in preview, for the whole episode |
