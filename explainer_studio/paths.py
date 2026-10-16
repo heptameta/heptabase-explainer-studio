@@ -200,6 +200,10 @@ class EpisodePaths:
         return self.root_dir_path / "feedback.json"
 
     @property
+    def notes_file_path(self) -> Path:
+        return self.root_dir_path / "notes.yaml"
+
+    @property
     def comment_screenshot_sheets_dir_path(self) -> Path:
         return self.root_dir_path / "comment-screenshot-sheets"
 

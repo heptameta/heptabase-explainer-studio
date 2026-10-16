@@ -1,7 +1,7 @@
 // The video page: the latest delivery of one episode, its comments, the survey (a rating, and the watch depth in dev
 // mode) and sharing with the team.
 // Keys: Space plays or pauses, the arrows move 5 s, M adds a comment (the video pauses; Enter saves and plays on,
-// Esc cancels), C turns subtitles on or off and T turns theater mode on or off. The video element is made once;
+// Esc cancels), C turns subtitles on or off, T turns theater mode on or off, N the chapters view and W the whiteboard. The video element is made once;
 // everything else is shown again from the server's JSON whenever feedback.json or the delivery changes, so the agent's
 // changes show up without a reload.
 'use strict';
@@ -64,12 +64,663 @@ function toggleTheaterMode() {
   if (!video) return;
   isTheaterModeOn = !isTheaterModeOn;
   try { localStorage.setItem('theaterMode', isTheaterModeOn ? 'on' : 'off'); } catch (error) { /* private window */ }
+  if (isTheaterModeOn && chapterModeName) setChapterMode(chapterModeName);
   applyTheaterMode();
   if (isTheaterModeOn) video.scrollIntoView({block: 'start'});
 }
 
+// Chapters and whiteboard -------------------------------------------------------------------------------------------
+// Two views of notes.yaml, next to theater mode in the toolbar (one of the three at a time):
+// - chapters: each part a large key frame (the player while the part plays) beside its segments, each a key frame, a
+//   title and the segment's core idea; choosing one plays it, and each opens into its handout;
+// - whiteboard: every episode's cards on one whiteboard for the series, a section per episode holding a section per
+//   part, opening on this episode and filling the page under the toolbar; with no video in view, the comment and
+//   subtitle buttons are off and the rest of the page is hidden.
+// A segment's handout is cards, one claim each: the claim as the title, then numbered points with their key phrases
+// highlighted. A card is drawn the way a Heptabase card draws what was pasted into it, so what the reader sees is what
+// a copy gives.
+const CHAPTER_MODE_NAMES = ['chapters', 'whiteboard'];
+let chapterModeName = (() => {
+  try {
+    const savedName = localStorage.getItem('chapterMode');
+    return CHAPTER_MODE_NAMES.includes(savedName) ? savedName : null;
+  } catch (error) { return null; }
+})();
+let chaptersJson = null;
+let activeScreen = null;  // the part frame the video plays in, in the chapters view
+const openHandoutSegmentIds = new Set();
+// isMoved: the viewer has panned or zoomed since the board was last fitted, so it stays where they put it;
+// fitsAll: the last fit showed the whole series rather than this episode
+const board = {x: 0, y: 0, scale: 1, isFitted: false, isMoved: false, fitsAll: false, openCardId: null};
+const SECTION_COLOR_NAMES = ['blue', 'yellow', 'green', 'purple', 'orange', 'red'];
+function getMediaUrl(name, episodeId = EPISODE_ID) {
+  return `${BOOT.baseUrl}/media/${episodeId}/${name}`;
+}
+
+function getFrameUrl(beatId, episodeId = EPISODE_ID) {
+  return getMediaUrl(`frames/${encodeURIComponent(beatId)}.jpg`, episodeId);
+}
+
+function getHandoutImageUrl(assetFilePath, episodeId = EPISODE_ID) {
+  return getMediaUrl(`handout-images/${assetFilePath.split('/').map(encodeURIComponent).join('/')}`, episodeId);
+}
+
+// whether a view has something to show: the chapters view this episode's cards, the whiteboard the series' cards
+function checkIsChapterModeAvailable(name) {
+  return name === 'chapters' ? Boolean(pageData.chapters) : name === 'whiteboard' && Boolean(pageData.board);
+}
+
+// **bold** and ==highlight== in a card's text, as text nodes, <strong> and <mark>; nothing else in the text is markup
+function buildInlineText(text) {
+  return text.split(/(\*\*[^*]+\*\*|==[^=]+==)/).filter(Boolean).map((piece) => {
+    if (piece.startsWith('**') && piece.endsWith('**')) return buildElement('strong', {}, piece.slice(2, -2));
+    if (piece.startsWith('==') && piece.endsWith('==')) return buildElement('mark', {}, piece.slice(2, -2));
+    return piece;
+  });
+}
+
+function findBeatStartSeconds(beatId) {
+  for (const part of pageData.chapters.parts) {
+    for (const segment of part.segments) {
+      const beat = segment.beats.find((candidate) => candidate.id === beatId);
+      if (beat) return beat.startSeconds;
+    }
+  }
+  return null;
+}
+
+// A point's number at its depth, as the app writes it: 1. at the top, then a., then i.
+function formatPointNumber(depth, number) {
+  if (depth % 3 === 1) {
+    let letters = '';
+    for (let value = number; value > 0; value = Math.floor((value - 1) / 26)) {
+      letters = String.fromCharCode(97 + (value - 1) % 26) + letters;
+    }
+    return `${letters}.`;
+  }
+  if (depth % 3 === 2) {
+    const romanNumerals = [[10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']];
+    let roman = '', value = number;
+    for (const [amount, numeral] of romanNumerals) while (value >= amount) { roman += numeral; value -= amount; }
+    return `${roman}.`;
+  }
+  return `${number}.`;
+}
+
+// A point's picture; a frame of this episode's video plays from its beat when chosen.
+function buildPicture(point, partIndex, episodeId) {
+  const isFrame = Boolean(point.frame);
+  const startSeconds = isFrame && episodeId === EPISODE_ID ? findBeatStartSeconds(point.frame) : null;
+  const image = buildElement('img', {src: isFrame ? getFrameUrl(point.frame, episodeId)
+    : getHandoutImageUrl(point.image, episodeId),
+    alt: point.caption || '', onload: (event) => rememberImageDataUrl(event.target)});  // not lazy: the whiteboard's
+  // cards are drawn scaled, where the browser may never decide to load them
+  return [
+    buildElement('div', {class: 'image'}, isFrame && startSeconds !== null
+      ? buildElement('button', {type: 'button', title: translate('chapters.playFromHere'),
+        onclick: (event) => { event.stopPropagation(); playChapters(partIndex, startSeconds); }}, image)
+      : image),
+    point.caption ? buildElement('p', {}, buildElement('em', {}, point.caption)) : null,
+  ];
+}
+
+// Numbered points; a point's sub-points and picture are nested under its text.
+function buildPoints(points, depth, partIndex, episodeId) {
+  return buildElement('div', {class: 'numbered'}, points.map((point, index) => buildElement('div', {class: 'item'},
+    buildElement('span', {class: 'number'}, formatPointNumber(depth, index + 1)),
+    buildElement('div', {class: 'nested'},
+      buildElement('p', {}, buildInlineText(point.text)),
+      point.points && point.points.length ? buildPoints(point.points, depth + 1, partIndex, episodeId) : null,
+      point.frame || point.image ? buildPicture(point, partIndex, episodeId) : null))));
+}
+
+// A card's content: its claim as the first heading, then its points.
+function buildCardContent(card, partIndex) {
+  return buildElement('div', {class: 'card-content'}, buildElement('h1', {}, buildInlineText(card.title)),
+    buildPoints(card.points, 0, partIndex, card.episodeId));
+}
+
+// A card in a side panel: a header with its segment, copy, and a way to the card on the whiteboard, above the content.
+function buildPanelCard(card, segment, partIndex) {
+  return buildElement('article', {class: 'hb-panel-card'},
+    buildElement('div', {class: 'panel-card-head'},
+      buildElement('span', {class: 'icon'}, buildIcon('card')),
+      buildElement('span', {class: 'label'}, segment.title),
+      buildElement('button', {class: 'hb-icon-btn', type: 'button', title: translate('chapters.copyCard'),
+        'aria-label': translate('chapters.copyCard'), onclick: () => copyCard(card)}, buildIcon('copy')),
+      buildElement('button', {class: 'hb-icon-btn', type: 'button', title: translate('chapters.locateCard'),
+        'aria-label': translate('chapters.locateCard'), onclick: () => locateBoardCard(card.id)}, buildIcon('whiteboard'))),
+    buildCardContent(card, partIndex));
+}
+
+// How many cards, in words: 兩張卡片, 五張卡片, 5 cards.
+function formatCardCount(count) {
+  if (count === 1) return translate('chapters.oneCard');
+  if (!document.documentElement.lang.startsWith('zh') || count > 99) return translate('chapters.cards', {count});
+  const digits = '〇一兩三四五六七八九', tens = Math.floor(count / 10), ones = count % 10;
+  const words = count < 10 ? digits[count]
+    : `${tens > 1 ? '〇一二三四五六七八九'[tens] : ''}十${ones ? '〇一二三四五六七八九'[ones] : ''}`;
+  return translate('chapters.cards', {count: words});
+}
+
+// Playing: the one video element moves into the chosen part's frame, and back under the title when the view closes.
+function placeVideo(screen) {
+  if (!video || activeScreen === screen) return;
+  if (activeScreen) activeScreen.showKeyFrame();
+  activeScreen = screen;
+  if (screen) screen.replaceChildren(video); else nodes.videoHome.replaceChildren(video);
+}
+
+function playChapters(partIndex, startSeconds) {
+  if (!video) return;
+  if (chapterModeName !== 'chapters') setChapterMode('chapters');
+  placeVideo(nodes.chapterScreens[partIndex]);
+  video.currentTime = startSeconds;
+  video.play();
+  nodes.chapterScreens[partIndex].scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
+function showChapterProgress() {
+  if (!nodes.chapterRows) return;
+  const seconds = video ? video.currentTime : 0;
+  for (const {segment, row, bar} of nodes.chapterRows) {
+    const isPlaying = chapterModeName === 'chapters' && !!activeScreen && seconds >= segment.startSeconds
+      && seconds < segment.endSeconds;
+    row.classList.toggle('playing', isPlaying);
+    bar.style.width = isPlaying
+      ? `${(100 * (seconds - segment.startSeconds) / (segment.endSeconds - segment.startSeconds)).toFixed(1)}%` : '0';
+  }
+}
+
+function buildChaptersView(chapters) {
+  nodes.chapterScreens = [];
+  nodes.chapterRows = [];
+  const parts = chapters.parts.map((part, partIndex) => {
+    const first = part.segments[0], last = part.segments[part.segments.length - 1];
+    const minutes = Math.max(1, Math.round((last.endSeconds - first.startSeconds) / 60));
+    const screen = buildElement('div', {class: 'screen'});
+    screen.showKeyFrame = () => screen.replaceChildren(
+      buildElement('img', {src: getFrameUrl(first.keyFrame), alt: ''}),
+      buildElement('button', {class: 'play', type: 'button', onclick: () => playChapters(partIndex, first.startSeconds)},
+        buildElement('span', {}, translate('chapters.playFrom', {time: formatTime(first.startSeconds)}))));
+    screen.showKeyFrame();
+    nodes.chapterScreens.push(screen);
+    const rows = part.segments.map((segment) => {
+      const bar = buildElement('i', {});
+      const handoutButton = buildElement('button', {class: 'hb-btn text small', type: 'button'}, '');
+      const row = buildElement('div', {class: 'segment', role: 'button', tabindex: '0',
+        onclick: () => playChapters(partIndex, segment.startSeconds),
+        onkeydown: (event) => {
+          if (event.key === 'Enter') { event.preventDefault(); playChapters(partIndex, segment.startSeconds); }
+        }},
+        buildElement('div', {class: 'thumb'}, buildElement('img', {src: getFrameUrl(segment.keyFrame), alt: '',
+          loading: 'lazy'}), buildElement('span', {class: 'bar'}, bar)),
+        buildElement('div', {class: 'body'},
+          buildElement('div', {class: 'title'}, buildElement('b', {}, segment.title),
+            buildElement('span', {class: 'hb-meta'}, `${formatTime(segment.startSeconds)} · ${translate(
+              'chapters.seconds', {seconds: Math.round(segment.endSeconds - segment.startSeconds)})}`)),
+          buildElement('p', {}, segment.summary),
+          handoutButton));
+      const slot = buildElement('div', {class: 'handout-slot'});
+      const showHandout = () => {
+        const isOpen = openHandoutSegmentIds.has(segment.id);
+        handoutButton.setAttribute('aria-expanded', String(isOpen));
+        handoutButton.textContent = isOpen ? translate('chapters.closeCards') : formatCardCount(segment.cards.length);
+        slot.replaceChildren(...(isOpen ? segment.cards.map((card) => buildPanelCard(card, segment, partIndex)) : []));
+      };
+      handoutButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (openHandoutSegmentIds.has(segment.id)) openHandoutSegmentIds.delete(segment.id);
+        else openHandoutSegmentIds.add(segment.id);
+        showHandout();
+      });
+      showHandout();
+      nodes.chapterRows.push({segment, row, bar});
+      return [row, slot];
+    });
+    return buildElement('section', {class: 'part'},
+      buildElement('h3', {}, buildElement('span', {class: 'number'}, translate('chapters.part', {number: partIndex + 1})),
+        part.title, buildElement('span', {class: 'hb-meta'}, translate('chapters.minutes', {minutes}))),
+      buildElement('div', {class: 'part-grid'}, screen, buildElement('div', {class: 'segments'}, rows.flat())));
+  });
+  nodes.chapters.replaceChildren(...parts);
+}
+
+// The whiteboard: sections in a row, one per part; in a section, a column per segment, its cards in rows by the arrows
+// between them (a card below the cards that lead to it); the arrows drawn between the cards. It pans by dragging or
+// scrolling and zooms with the buttons or a pinch (Ctrl or Cmd with the wheel), around the pointer. A section's title
+// keeps its size on the screen at any zoom, as in the app. A click opens a card: it is selected, its text can be
+// selected, and its content scrolls when it is longer than the card; a click on the board or Esc closes it.
+const BOARD_MIN_SCALE = 0.1, BOARD_MAX_SCALE = 2;
+const BOARD_CLICK_PIXELS = 4;  // a press that moves less than this is a click, not a drag
+
+function applyBoardTransform(isAnimated) {
+  nodes.boardCanvas.classList.toggle('animated', Boolean(isAnimated));
+  nodes.boardCanvas.style.transform = `translate(${board.x}px, ${board.y}px) scale(${board.scale})`;
+  nodes.boardCanvas.style.setProperty('--wb-scale', String(board.scale));
+  nodes.boardZoomLabel.textContent = `${Math.round(board.scale * 100)}%`;
+}
+
+function zoomBoard(factor, centerX, centerY) {
+  const viewportRect = nodes.boardViewport.getBoundingClientRect();
+  const originX = centerX ?? viewportRect.width / 2, originY = centerY ?? viewportRect.height / 2;
+  const nextScale = Math.min(BOARD_MAX_SCALE, Math.max(BOARD_MIN_SCALE, board.scale * factor));
+  board.x = originX - (originX - board.x) * nextScale / board.scale;
+  board.y = originY - (originY - board.y) * nextScale / board.scale;
+  board.scale = nextScale;
+  board.isMoved = true;
+  applyBoardTransform(centerX === undefined);
+}
+
+// The episode's section in view (or the whole series' board), as large as it fits, with room above for the
+// sections' titles (which keep their size on the screen) and below for the tools.
+const BOARD_FIT_MARGINS = {top: 48, right: 24, bottom: 56, left: 24};
+
+// Where nodes on the board are, together, in the board's own units.
+function findBoardBox(boxNodes) {
+  const canvasRect = nodes.boardCanvas.getBoundingClientRect();
+  const rects = boxNodes.map((node) => node.getBoundingClientRect());
+  const left = Math.min(...rects.map((rect) => rect.left)), top = Math.min(...rects.map((rect) => rect.top));
+  const right = Math.max(...rects.map((rect) => rect.right)), bottom = Math.max(...rects.map((rect) => rect.bottom));
+  return {left: (left - canvasRect.left) / board.scale, top: (top - canvasRect.top) / board.scale,
+    width: (right - left) / board.scale, height: (bottom - top) / board.scale};
+}
+
+function fitBoard(fitsAll) {
+  const viewportRect = nodes.boardViewport.getBoundingClientRect();
+  if (!viewportRect.width) return;
+  const episodeNodes = [...nodes.boardCanvas.querySelectorAll('.wb-episode')];
+  const currentNode = nodes.boardCanvas.querySelector('.wb-episode.current');
+  const box = findBoardBox(fitsAll || !currentNode ? episodeNodes : [currentNode]);
+  const {top, right, bottom, left} = BOARD_FIT_MARGINS;
+  const width = viewportRect.width - left - right, height = viewportRect.height - top - bottom;
+  board.scale = Math.min(1, width / box.width, height / box.height);
+  board.x = left + (width - box.width * board.scale) / 2 - box.left * board.scale;
+  board.y = top + (height - box.height * board.scale) / 2 - box.top * board.scale;
+  board.isFitted = true;
+  board.isMoved = false;
+  board.fitsAll = Boolean(fitsAll);
+  applyBoardTransform(false);
+}
+
+// A segment's cards in rows: a card goes one row below the latest of the segment's earlier cards that lead to it, so
+// that an argument reads downwards and a claim's cases sit side by side.
+function findCardRows(cards) {
+  const rowById = new Map();
+  for (const card of cards) {
+    const sourceRows = cards.filter((source) => rowById.has(source.id) && source.leadsTo.includes(card.id))
+      .map((source) => rowById.get(source.id));
+    rowById.set(card.id, sourceRows.length ? Math.max(...sourceRows) + 1 : 0);
+  }
+  const rows = [];
+  for (const card of cards) (rows[rowById.get(card.id)] ||= []).push(card);
+  return rows.filter(Boolean);
+}
+
+// The arrows of the cards' leads_to, shaped the way the app shapes its connectors. Down a segment's column: straight
+// when the two cards line up, and an elbow (down, across, down) when a card leads to cases side by side or cases lead
+// to one card. Between columns: a curve from side to side, its ends leaving the cards straight for a third of the way,
+// less the nearer the two ends are to level or to one above the other, so that it straightens into a line.
+const ARROW_GAP = 8, ARROW_MAX_SLOPE = 2.5;
+
+function getCurveHandleLength(start, end) {
+  const dx = end[0] - start[0], dy = end[1] - start[1];
+  const slope = Math.abs(dy / dx);
+  let length = Math.hypot(dx, dy) / 2;
+  if (slope > ARROW_MAX_SLOPE) length /= slope / ARROW_MAX_SLOPE;
+  else if (1 / slope > ARROW_MAX_SLOPE) length /= (1 / slope) / ARROW_MAX_SLOPE;
+  return length * 2 / 3;
+}
+
+function buildArrowPath(from, to) {
+  if (from.episode !== to.episode) {  // to another episode's section, above or below: a curve from end to end
+    const isDown = to.top >= from.top, side = isDown ? 1 : -1;
+    const start = [from.left + from.width / 2, isDown ? from.top + from.height + ARROW_GAP : from.top - ARROW_GAP];
+    const end = [to.left + to.width / 2, isDown ? to.top - ARROW_GAP : to.top + to.height + ARROW_GAP];
+    const handle = getCurveHandleLength(start, end);
+    return `M${start[0]} ${start[1]} C${start[0]} ${start[1] + side * handle} ${end[0]} ${end[1] - side * handle} `
+      + `${end[0]} ${end[1]}`;
+  }
+  if (from.column === to.column) {
+    const isDown = to.top >= from.top;
+    const startX = from.left + from.width / 2, endX = to.left + to.width / 2;
+    const startY = isDown ? from.top + from.height + ARROW_GAP : from.top - ARROW_GAP;
+    const endY = isDown ? to.top - ARROW_GAP : to.top + to.height + ARROW_GAP;
+    if (Math.abs(startX - endX) < 1) return `M${startX} ${startY} L${endX} ${endY}`;
+    const middleY = (startY + endY) / 2;
+    return `M${startX} ${startY} L${startX} ${middleY} L${endX} ${middleY} L${endX} ${endY}`;
+  }
+  const isRight = to.left >= from.left, side = isRight ? 1 : -1;
+  const start = [isRight ? from.left + from.width + ARROW_GAP : from.left - ARROW_GAP, from.top + from.height / 2];
+  const end = [isRight ? to.left - ARROW_GAP : to.left + to.width + ARROW_GAP, to.top + to.height / 2];
+  const handle = getCurveHandleLength(start, end);
+  return `M${start[0]} ${start[1]} C${start[0] + side * handle} ${start[1]} ${end[0] - side * handle} ${end[1]} `
+    + `${end[0]} ${end[1]}`;
+}
+
+function drawBoardArrows() {
+  const canvasRect = nodes.boardCanvas.getBoundingClientRect();
+  const boxById = new Map([...nodes.boardCanvas.querySelectorAll('.wb-card')].map((cardNode) => {
+    const rect = cardNode.getBoundingClientRect();
+    return [cardNode.dataset.cardId, {left: (rect.left - canvasRect.left) / board.scale,
+      top: (rect.top - canvasRect.top) / board.scale, width: rect.width / board.scale, height: rect.height / board.scale,
+      column: cardNode.closest('.wb-segment'), episode: cardNode.closest('.wb-episode')}];
+  }));
+  const paths = [];
+  for (const card of listBoardCards()) {
+    for (const targetId of card.leadsTo) {
+      const from = boxById.get(card.id), to = boxById.get(targetId);
+      if (from && to) paths.push(buildArrowPath(from, to));
+    }
+  }
+  nodes.boardArrows.setAttribute('width', nodes.boardCanvas.offsetWidth);
+  nodes.boardArrows.setAttribute('height', nodes.boardCanvas.offsetHeight);
+  nodes.boardArrows.innerHTML = '<defs><marker id="wb-arrowhead" viewBox="-2 0 14 12" refX="10" refY="6" '
+    + 'markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L12 6 L0 12 Z"/></marker></defs>'
+    + paths.map((path) => `<path d="${path}" marker-end="url(#wb-arrowhead)"/>`).join('');
+}
+
+// Opens the card (or closes the open one, given null); a closed card shows its top again.
+function openBoardCard(cardId) {
+  board.openCardId = cardId;
+  for (const cardNode of nodes.boardCanvas.querySelectorAll('.wb-card')) {
+    const isOpen = cardNode.dataset.cardId === cardId;
+    if (!isOpen && cardNode.classList.contains('open')) cardNode.querySelector('.card-content').scrollTop = 0;
+    cardNode.classList.toggle('open', isOpen);
+  }
+  nodes.boardCopyCard.hidden = !cardId;
+}
+
+// The whiteboard, centred on the card at the largest zoom that shows all of it (at most 100%), with the card open.
+function locateBoardCard(cardId) {
+  if (chapterModeName !== 'whiteboard') setChapterMode('whiteboard');
+  // the whiteboard lays itself out and fits in the next frame; the card is found after that
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const cardNode = nodes.boardCanvas.querySelector(`.wb-card[data-card-id="${CSS.escape(cardId)}"]`);
+    const viewportRect = nodes.boardViewport.getBoundingClientRect();
+    const {left, top, width, height} = findBoardBox([cardNode]);
+    board.scale = Math.min(1, (viewportRect.width - 48) / width, (viewportRect.height - 80) / height);
+    board.x = (viewportRect.width - width * board.scale) / 2 - left * board.scale;
+    board.y = (viewportRect.height - height * board.scale) / 2 - top * board.scale;
+    board.isMoved = true;
+    applyBoardTransform(true);
+    openBoardCard(cardId);
+  }));
+}
+
+function listBoardCards() {
+  return pageData.board.episodes.flatMap((episode) => episode.parts.flatMap((part) =>
+    part.segments.flatMap((segment) => segment.cards)));
+}
+
+function findCard(cardId) {
+  return listBoardCards().find((card) => card.id === cardId);
+}
+
+function buildPartSection(part, partIndex) {
+  return buildElement('div', {class: `wb-section ${SECTION_COLOR_NAMES[partIndex % SECTION_COLOR_NAMES.length]}`},
+    buildElement('div', {class: 'wb-section-title', title: part.title}, buildElement('span', {}, part.title)),
+    part.segments.map((segment) => buildElement('div', {class: 'wb-segment'},
+      findCardRows(segment.cards).map((cards) => buildElement('div', {class: 'wb-card-row'}, cards.map((card) =>
+        buildElement('div', {class: `wb-card ${card.color || ''}`, dataset: {cardId: card.id}, tabindex: '0',
+          'aria-label': card.title, onkeydown: (event) => { if (event.key === 'Enter') openBoardCard(card.id); }},
+        buildCardContent(card, partIndex))))))));
+}
+
+function buildWhiteboardView(boardData) {
+  nodes.boardArrows = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  nodes.boardArrows.setAttribute('class', 'wb-arrows');
+  nodes.boardCanvas = buildElement('div', {class: 'wb-canvas'}, nodes.boardArrows,
+    buildElement('div', {class: 'wb-board'}, boardData.episodes.map((episode) => {
+      const title = `${episode.id.toUpperCase()} ${episode.title}`;
+      return buildElement('div', {class: `wb-episode${episode.id === EPISODE_ID ? ' current' : ''}`,
+        dataset: {episodeId: episode.id}},
+      buildElement('div', {class: 'wb-section-title', title}, buildElement('span', {}, title)),
+      episode.parts.map(buildPartSection));
+    })));
+  nodes.boardZoomLabel = buildElement('span', {class: 'label'}, '100%');
+  nodes.boardCopyCard = buildElement('button', {class: 'hb-btn text small', type: 'button', hidden: true,
+    onclick: () => copyCard(findCard(board.openCardId))}, translate('chapters.copyCard'));
+  nodes.boardViewport = buildElement('div', {class: 'wb-viewport'}, nodes.boardCanvas,
+    buildElement('div', {class: 'wb-tools'},
+      nodes.boardCopyCard,
+      buildElement('span', {class: 'divider'}),
+      buildElement('button', {class: 'hb-icon-btn', type: 'button', 'aria-label': translate('chapters.zoomOut'),
+        onclick: () => zoomBoard(1 / 1.25)}, '−'),
+      nodes.boardZoomLabel,
+      buildElement('button', {class: 'hb-icon-btn', type: 'button', 'aria-label': translate('chapters.zoomIn'),
+        onclick: () => zoomBoard(1.25)}, '+'),
+      buildElement('button', {class: 'hb-btn text small', type: 'button', onclick: () => fitBoard(true)},
+        translate('chapters.fit'))));
+  // a press on the board or a closed card drags the board, or is a click when it hardly moves; a press in the
+  // open card is the card's own (selecting text, its scrollbar)
+  let press = null;
+  nodes.boardViewport.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('.wb-card.open, .wb-tools') || event.button !== 0) return;
+    press = {startX: event.clientX, startY: event.clientY, x: event.clientX - board.x, y: event.clientY - board.y,
+      card: event.target.closest('.wb-card'), isDragging: false};
+    nodes.boardViewport.setPointerCapture(event.pointerId);
+  });
+  nodes.boardViewport.addEventListener('pointermove', (event) => {
+    if (!press) return;
+    if (!press.isDragging && Math.hypot(event.clientX - press.startX, event.clientY - press.startY) < BOARD_CLICK_PIXELS) {
+      return;
+    }
+    press.isDragging = true;
+    nodes.boardViewport.classList.add('dragging');
+    board.x = event.clientX - press.x;
+    board.y = event.clientY - press.y;
+    board.isMoved = true;
+    applyBoardTransform(false);
+  });
+  nodes.boardViewport.addEventListener('pointerup', () => {
+    if (press && !press.isDragging) openBoardCard(press.card ? press.card.dataset.cardId : null);
+    press = null;
+    nodes.boardViewport.classList.remove('dragging');
+  });
+  nodes.boardViewport.addEventListener('pointercancel', () => {
+    press = null;
+    nodes.boardViewport.classList.remove('dragging');
+  });
+  nodes.boardViewport.addEventListener('wheel', (event) => {
+    if (event.target.closest('.wb-tools')) return;
+    if (!(event.ctrlKey || event.metaKey) && event.target.closest('.wb-card.open')) return;  // the card scrolls
+    event.preventDefault();
+    if (event.ctrlKey || event.metaKey) {
+      const viewportRect = nodes.boardViewport.getBoundingClientRect();
+      zoomBoard(Math.exp(-event.deltaY / 300), event.clientX - viewportRect.left, event.clientY - viewportRect.top);
+    } else {
+      board.x -= event.deltaX;
+      board.y -= event.deltaY;
+      board.isMoved = true;
+      applyBoardTransform(false);
+    }
+  }, {passive: false});
+  nodes.whiteboard.replaceChildren(nodes.boardViewport);
+  board.isFitted = false;
+  board.openCardId = null;
+  applyBoardTransform(false);
+  // pictures loading change the cards' heights, and the window its size: the arrows follow, and so does the fit
+  // until the viewer moves the board
+  nodes.boardResizeObserver?.disconnect();
+  nodes.boardResizeObserver = new ResizeObserver(() => {
+    if (chapterModeName !== 'whiteboard') return;
+    drawBoardArrows();
+    if (!board.isMoved) fitBoard(board.fitsAll);
+  });
+  nodes.boardResizeObserver.observe(nodes.boardViewport);
+  nodes.boardResizeObserver.observe(nodes.boardCanvas);
+}
+
+function showChapters() {
+  const json = JSON.stringify([pageData.chapters, pageData.board]);
+  if (json === chaptersJson) return;
+  chaptersJson = json;
+  if (activeScreen) placeVideo(null);
+  if (pageData.chapters) buildChaptersView(pageData.chapters); else nodes.chapters.replaceChildren();
+  if (pageData.board) buildWhiteboardView(pageData.board); else nodes.whiteboard.replaceChildren();
+  applyChapterMode();
+}
+
+function applyChapterMode() {
+  const modeName = checkIsChapterModeAvailable(chapterModeName) ? chapterModeName : null;
+  document.body.classList.toggle('chapters-mode', modeName === 'chapters');
+  document.body.classList.toggle('whiteboard-mode', modeName === 'whiteboard');
+  for (const [name, button] of [['chapters', nodes.chaptersMode], ['whiteboard', nodes.whiteboardMode]]) {
+    if (!button) continue;
+    button.setAttribute('aria-pressed', String(modeName === name));
+    button.hidden = !checkIsChapterModeAvailable(name);
+  }
+  if (modeName !== 'chapters' && activeScreen) { video.pause(); placeVideo(null); }
+  const isWhiteboardOn = modeName === 'whiteboard';
+  if (isWhiteboardOn && video && !video.paused) video.pause();
+  for (const button of [nodes.addComment, nodes.subtitles]) if (button) button.disabled = isWhiteboardOn;
+  if (isWhiteboardOn) {
+    requestAnimationFrame(() => {
+      drawBoardArrows();
+      if (!board.isFitted) fitBoard(false);
+    });
+  }
+  showChapterProgress();
+}
+
+function setChapterMode(name) {
+  if (!checkIsChapterModeAvailable(name) || !video) return;
+  chapterModeName = chapterModeName === name ? null : name;
+  try { localStorage.setItem('chapterMode', chapterModeName || 'off'); } catch (error) { /* private window */ }
+  if (chapterModeName && isTheaterModeOn) toggleTheaterMode();
+  applyChapterMode();
+  showChapterModeTop('smooth');
+}
+
+// The chapters view opens with the toolbar just under the header, so the buttons stay in sight above it; the
+// whiteboard is the whole page and does not scroll. Either way a reload opens there, not where the page was.
+function showChapterModeTop(behavior) {
+  history.scrollRestoration = chapterModeName ? 'manual' : 'auto';
+  if (chapterModeName === 'chapters') nodes.toolbar.scrollIntoView({behavior, block: 'start'});
+  else if (chapterModeName === 'whiteboard') window.scrollTo(0, 0);
+}
+
+async function fetchDataUrl(url) {
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const blob = await response.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"]/g, (character) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[character]);
+}
+
+// Copying a card puts rich text on the clipboard, pictures inside, for notes apps, and Markdown as the plain text: its
+// claim as the first heading, then its numbered points. The pictures go in as data URLs: the ones already shown are
+// remembered when they load, and the rest are fetched while the clipboard waits. Where the page may
+// not write the clipboard itself (some embedded browsers), the browser's own copy of a selection is used, with the
+// remembered pictures and links for the rest.
+const imageDataUrlByUrlMap = new Map();
+
+function rememberImageDataUrl(image) {
+  if (imageDataUrlByUrlMap.has(image.src) || !image.naturalWidth) return;
+  const canvas = buildElement('canvas', {width: image.naturalWidth, height: image.naturalHeight});
+  canvas.getContext('2d').drawImage(image, 0, 0);
+  try { imageDataUrlByUrlMap.set(image.src, canvas.toDataURL('image/jpeg', 0.86)); } catch (error) { /* tainted */ }
+}
+
+function getPointImageUrl(point, episodeId) {
+  return new URL(point.frame ? getFrameUrl(point.frame, episodeId) : getHandoutImageUrl(point.image, episodeId),
+    window.location.href).href;
+}
+
+function listCardPoints(points) {
+  return points.flatMap((point) => [point, ...listCardPoints(point.points || [])]);
+}
+
+function buildPointsMarkdown(points, depth, episodeId) {
+  const indent = '   '.repeat(depth);
+  return points.map((point, index) => [
+    `${indent}${index + 1}. ${point.text}`,
+    ...(point.points && point.points.length ? [buildPointsMarkdown(point.points, depth + 1, episodeId)] : []),
+    ...(point.frame || point.image
+      ? [`${indent}   ![${point.caption || ''}](${getPointImageUrl(point, episodeId)})`,
+        ...(point.caption ? [`${indent}   *${point.caption}*`] : [])]
+      : []),
+  ].join('\n')).join('\n');
+}
+
+function buildCardMarkdown(card) {
+  return `# ${card.title}\n\n${buildPointsMarkdown(card.points, 0, card.episodeId)}`;
+}
+
+function formatInlineHtml(text) {
+  return escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/==([^=]+)==/g, '<mark>$1</mark>');
+}
+
+function buildPointsHtml(points, getImageSource, episodeId) {
+  return `<ol>${points.map((point) => {
+    const source = point.frame || point.image ? getImageSource(getPointImageUrl(point, episodeId)) : null;
+    return `<li><p>${formatInlineHtml(point.text)}</p>`
+      + (point.points && point.points.length ? buildPointsHtml(point.points, getImageSource, episodeId) : '')
+      + (source ? `<p><img src="${escapeHtml(source)}" alt="${escapeHtml(point.caption || '')}"></p>` : '')
+      + (point.caption ? `<p><em>${escapeHtml(point.caption)}</em></p>` : '') + '</li>';
+  }).join('')}</ol>`;
+}
+
+function buildCardHtml(card, getImageSource) {
+  return `<h1>${formatInlineHtml(card.title)}</h1>\n${buildPointsHtml(card.points, getImageSource, card.episodeId)}`;
+}
+
+async function buildCardHtmlBlob(card) {
+  const urls = listCardPoints(card.points).filter((point) => point.frame || point.image)
+    .map((point) => getPointImageUrl(point, card.episodeId));
+  await Promise.all(urls.filter((url) => !imageDataUrlByUrlMap.has(url)).map(async (url) => {
+    const dataUrl = await fetchDataUrl(url);
+    if (dataUrl) imageDataUrlByUrlMap.set(url, dataUrl);
+  }));
+  return new Blob([buildCardHtml(card, (url) => imageDataUrlByUrlMap.get(url))], {type: 'text/html'});
+}
+
+function copySelectionOf(html) {
+  const holder = buildElement('div', {contenteditable: 'true', style: 'position:fixed;left:-10000px;top:0', html});
+  document.body.append(holder);
+  const range = document.createRange();
+  range.selectNodeContents(holder);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  let isCopied = false;
+  try { isCopied = document.execCommand('copy'); } catch (error) { isCopied = false; }
+  selection.removeAllRanges();
+  holder.remove();
+  return isCopied;
+}
+
+async function copyCard(card) {
+  const markdown = buildCardMarkdown(card);
+  let isCopied = false;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({'text/html': buildCardHtmlBlob(card),
+      'text/plain': new Blob([markdown], {type: 'text/plain'})})]);
+    isCopied = true;
+  } catch (error) {
+    isCopied = copySelectionOf(buildCardHtml(card, (url) => imageDataUrlByUrlMap.get(url) || url));
+  }
+  showToast(translate(isCopied ? 'chapters.copied' : 'chapters.copyFailed'));
+}
+
 function togglePlay() {
   if (!video) return;
+  if (document.body.classList.contains('chapters-mode') && !activeScreen) {
+    // the chapters view shows no player until a part plays: play where the video is, in that part's frame
+    const parts = pageData.chapters.parts;
+    const partIndex = Math.max(0, parts.findIndex((part) => video.currentTime < part.segments[part.segments.length - 1].endSeconds));
+    playChapters(partIndex, video.currentTime);
+    return;
+  }
   if (video.paused || video.ended) video.play(); else video.pause();
 }
 
@@ -519,6 +1170,7 @@ function showHead() {
 
 function showPage() {
   showHead();
+  showChapters();
   showNotices();
   showComments();
   showSurvey();
@@ -554,10 +1206,27 @@ function mountPage() {
     ? buildElement('button', {class: 'hb-btn outline', type: 'button', 'aria-pressed': String(isShowingSubtitles),
       onclick: toggleSubtitles}, translate('video.subtitles'), buildElement('kbd', {}, 'C'))
     : null;
+  nodes.addComment = buildElement('button', {class: 'hb-btn fill', type: 'button', onclick: startComment},
+    buildIcon('plus'), translate('video.addComment'), buildElement('kbd', {}, 'M'));
   nodes.theaterMode = video
     ? buildElement('button', {class: 'hb-btn outline', type: 'button', 'aria-pressed': String(isTheaterModeOn),
       onclick: toggleTheaterMode}, translate('video.theaterMode'), buildElement('kbd', {}, 'T'))
     : null;
+  // shown once notes.yaml fits the delivered video (for the whiteboard, any episode's), which the agent may write
+  // while the page is open
+  nodes.chaptersMode = video
+    ? buildElement('button', {class: 'hb-btn outline', type: 'button', hidden: !checkIsChapterModeAvailable('chapters'),
+      onclick: () => setChapterMode('chapters')}, translate('chapters.button'), buildElement('kbd', {}, 'N'))
+    : null;
+  nodes.whiteboardMode = video
+    ? buildElement('button', {class: 'hb-btn outline', type: 'button', hidden: !checkIsChapterModeAvailable('whiteboard'),
+      onclick: () => setChapterMode('whiteboard')}, translate('chapters.whiteboardButton'), buildElement('kbd', {}, 'W'))
+    : null;
+  if (checkIsChapterModeAvailable(chapterModeName)) isTheaterModeOn = false;  // one view at a time
+  nodes.videoHome = buildElement('div', {class: 'video-home'}, video);
+  nodes.chapters = buildElement('section', {class: 'chapters', 'aria-label': translate('chapters.button')});
+  nodes.whiteboard = buildElement('section', {class: 'whiteboard', 'aria-label': translate('chapters.whiteboardButton')});
+  if (video) video.addEventListener('timeupdate', showChapterProgress);
   const keyHints = video && buildElement('div', {class: 'keys hb-meta'},
     buildElement('span', {}, buildElement('kbd', {}, translate('video.keys.space')), translate('video.keys.play')),
     buildElement('span', {}, buildElement('kbd', {}, '←'), buildElement('kbd', {}, '→'),
@@ -569,12 +1238,13 @@ function mountPage() {
       nodes.switcher),
     buildElement('div', {class: 'hb-head'}, nodes.eyebrow, nodes.title, nodes.meta),
     nodes.notices,
-    video,
-    buildElement('div', {class: 'toolbar'},
-      buildElement('button', {class: 'hb-btn fill', type: 'button', onclick: startComment}, buildIcon('plus'),
-        translate('video.addComment'), buildElement('kbd', {}, 'M')),
-      nodes.subtitles, nodes.theaterMode, keyHints),
+    video && nodes.videoHome,
+    nodes.toolbar = buildElement('div', {class: 'toolbar'},
+      nodes.addComment,
+      nodes.subtitles, nodes.theaterMode, nodes.chaptersMode, nodes.whiteboardMode, keyHints),
     nodes.composer,
+    nodes.chapters,
+    nodes.whiteboard,
     buildElement('section', {class: 'hb-section'},
       buildElement('h2', {}, translate('video.comments.heading'), nodes.commentCount),
       buildElement('p', {class: 'hb-lead'}, translate('video.comments.lead')), nodes.comments),
@@ -592,6 +1262,7 @@ function mountPage() {
   showPage();
   applySubtitles();
   applyTheaterMode();
+  if (checkIsChapterModeAvailable(chapterModeName)) requestAnimationFrame(() => showChapterModeTop('instant'));
   if (pageData.isDevModeOn) fetchCostReport();
 }
 
@@ -618,12 +1289,23 @@ window.addEventListener('keydown', (event) => {
   if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !pageData) return;
   if (checkIsTyping(event.target) || (nodes.dialog && nodes.dialog.open)) return;
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  // the whiteboard shows no video: playing and commenting wait until it closes, and Esc closes its open card
+  if (document.body.classList.contains('whiteboard-mode')) {
+    if ([' ', 'ArrowLeft', 'ArrowRight', 'm', 'c'].includes(key)) return;
+    if (key === 'Escape' && board.openCardId) {
+      openBoardCard(null);
+      event.preventDefault();
+      return;
+    }
+  }
   if (key === ' ') togglePlay();
   else if (key === 'ArrowLeft') seekBy(-SEEK_SECONDS);
   else if (key === 'ArrowRight') seekBy(SEEK_SECONDS);
   else if (key === 'm') startComment();
   else if (key === 'c') toggleSubtitles();
   else if (key === 't') toggleTheaterMode();
+  else if (key === 'n') setChapterMode('chapters');
+  else if (key === 'w') setChapterMode('whiteboard');
   else return;
   event.preventDefault();
   event.stopPropagation();

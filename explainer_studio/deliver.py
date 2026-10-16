@@ -109,6 +109,10 @@ def find_delivery_problems(series: Series, episode_id: str, script: Script) -> l
     problems += [f"automatic check {issue.check_name} in scene {issue.scene_id}"
                  + (f", beat {issue.beat_id}" if issue.beat_id else "") + f": {issue.detail}"
                  for issue in automatic_checks.find_blocking_issues()]
+    # the cards, so the video page shows the chapters and the whiteboard from the moment of delivery
+    from .chapters import find_episode_notes_problems
+
+    problems += find_episode_notes_problems(series, episode_id, timeline)
     return problems
 
 

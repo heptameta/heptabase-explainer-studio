@@ -14,7 +14,7 @@ from ..errors import StudioError
 # each command is the click command or group of the same name in the module of the same name in this package (with
 # underscores for dashes)
 COMMAND_NAMES = ("setup", "doctor", "guide", "plan", "script", "narrate", "preview", "render", "video", "deliver", "feedback",
-                 "gap", "cost", "asset", "dev-mode", "upgrade")
+                 "gap", "notes", "cost", "asset", "dev-mode", "upgrade")
 
 
 class LazyGroup(click.Group):

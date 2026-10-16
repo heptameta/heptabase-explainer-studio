@@ -307,6 +307,84 @@ rounds:
 | `note` | text | no |
 <!-- generated:audience-reviews end -->
 
+## notes.yaml
+
+The episode's cards, written while the episode is made and checked by `deliver` (`cards.md` says how to write them). The parts hold every scene of the
+delivered video once, in order; each scene is a segment with its cards.
+
+```yaml
+parts:
+  - title: Water is densest a little above freezing        # a knowledge point, never a question
+    segments: [opening, density]                           # scene ids, in the video's order
+segments:
+  density:
+    title: Water expands when it freezes
+    summary: Below 4 °C water takes more room as it cools, and ice takes more still, so ice is lighter than water.
+    key_frame: two_cups                                    # a beat of this scene
+    cards:
+      - id: ice_expands                                    # unique in the episode
+        title: Ice floats because water expands when it freezes.
+        color: yellow                                      # optional: yellow, green or red
+        points:
+          - The same water takes ==about 9% more room== as ice.
+          - text: "**Density** is how much mass fits in a given room: more room for the same mass, less density."
+            points: [A litre of water weighs about 1 kg, A litre of ice about 0.92 kg]
+            frame: two_cups                                # the video's picture at the end of that beat's line
+            caption: The same mass, as water and as ice
+        leads_to: [lakes_freeze_top, ep03/hydrogen_bonds]  # arrows: a card of this episode, or <episode>/<card>
+```
+
+- In titles and points, `**bold**` marks a term where it is defined and `==highlight==` a point's key phrase.
+- A point is its text alone, or `text` with `points` (sub-points), a picture (`frame`, a beat id, or `image`, a
+  `credits.yaml` asset path) and its `caption`.
+- `explainer-studio notes check <episode>` checks the file against the render (or the latest delivery), as `deliver`
+  does.
+
+<!-- generated:notes begin: edit the source, then run scripts/release.py -->
+**Notes**
+
+| Field | Type | Required |
+|---|---|---|
+| `parts` | list of Part | yes |
+| `segments` | mapping | yes |
+
+**Part**
+
+| Field | Type | Required |
+|---|---|---|
+| `title` | text | yes |
+| `segments` | list of text | yes |
+
+**Segment**
+
+| Field | Type | Required |
+|---|---|---|
+| `title` | text | yes |
+| `summary` | text | yes |
+| `key_frame` | text | yes |
+| `cards` | list of Card | yes |
+
+**Card**
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | text | yes |
+| `title` | text | yes |
+| `color` | `yellow` / `green` / `red` or null | no |
+| `points` | list of Point | yes |
+| `leads_to` | list of text | no |
+
+**Point**
+
+| Field | Type | Required |
+|---|---|---|
+| `text` | text | yes |
+| `points` | list of Point | no |
+| `frame` | text or null | no |
+| `image` | text or null | no |
+| `caption` | text or null | no |
+<!-- generated:notes end -->
+
 ## Files the tools write
 
 Read these; do not edit them.

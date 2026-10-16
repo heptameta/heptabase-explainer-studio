@@ -8,7 +8,7 @@ help in `explainer_studio/cli/`, not here.
 ## `explainer-studio`
 
 ```text
-explainer-studio [--version] [--series PATH] setup|doctor|guide|plan|script|narrate|preview|render|video|deliver|feedback|gap|cost|asset|dev-mode|upgrade
+explainer-studio [--version] [--series PATH] setup|doctor|guide|plan|script|narrate|preview|render|video|deliver|feedback|gap|notes|cost|asset|dev-mode|upgrade
 ```
 
 Heptabase Explainer Studio: make narrated explainer videos from teaching materials.
@@ -266,6 +266,25 @@ Add a gap. Read gaps.json first: record the same gap only once.
 - `--episode EPISODE`: The episode it happened in (omit for the whole series).
 - `--need TEXT`: What the video needed. [required]
 - `--workaround TEXT`: What was used instead. [required]
+- `--series PATH`: The series folder (default: found by walking up from the current folder).
+
+### `explainer-studio notes`
+
+```text
+explainer-studio notes check
+```
+
+The delivered episode's chapters and cards (episodes/<episode>/notes.yaml), shown on the video page.
+
+#### `explainer-studio notes check`
+
+```text
+explainer-studio notes check EPISODE [--series PATH]
+```
+
+Check notes.yaml against the episode's render (or, without one, its latest delivery): every scene once, in order, every
+picture it names, and every arrow to a card of this or another episode. deliver checks the same.
+
 - `--series PATH`: The series folder (default: found by walking up from the current folder).
 
 ### `explainer-studio cost`
