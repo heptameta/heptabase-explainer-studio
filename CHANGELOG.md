@@ -6,6 +6,8 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-16
+
 ### Added
 
 - Before the first question, the agent tells a learner (the videos are for them) from a teacher (an author or teacher
@@ -26,15 +28,15 @@ in [UPGRADING.md](UPGRADING.md).
   the story uses it, often as its own episode by a presenter who teaches concepts. Such an episode picks up where the
   series stopped, uses the series' own examples and hands back to it. Each episode's outline now ends on its own answer:
   what undoes that answer waits for the episode about it.
+- A script audience review finding that says the reasoning is missing something (a premise, what a piece of evidence
+  is for, a reminder, one case of what a claim means) is fixed with its own beat even when it is marked minor, instead
+  of being kept because a minor fix may not add a sentence. The reviewer counts a skipped causal step the reasoning
+  depends on as a place it is lost.
 - Theo's recaps, slogans, key-point labels and closes name the episode's concrete things instead of sounding like a
   summary through wordplay alone. A key-point label says its idea, and the first says how many there are, so "the
   second key idea" minutes later no longer leaves the viewer wondering what the first was. The script audience review
   counts an empty summary line, or a numbered label whose earlier members the viewer cannot name, as a place the
   viewer is lost.
-- A script audience review finding that says the reasoning is missing something (a premise, what a piece of evidence
-  is for, a reminder, one case of what a claim means) is fixed with its own beat even when it is marked minor, instead
-  of being kept because a minor fix may not add a sentence. The reviewer counts a skipped causal step the reasoning
-  depends on as a place it is lost.
 - A dot sent along wires stays on them after the drawing moves or shrinks, an arrow spun in place stays in place, and an
   arc that should sweep out no longer swells out of a dot: the scene code guide says to move the path with the
   drawing, to rotate about the shape's own centre (for a curved arrow, `arrow.arc.get_arc_center()`) and to sweep
