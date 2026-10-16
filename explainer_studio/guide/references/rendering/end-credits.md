@@ -50,7 +50,9 @@ class EndCredits(EndCreditsScene):
 
   The language reference gives the call for scripts that need another template.
 - The layout, the colours and the closing are fixed, so every episode ends the same way. About eight
-  assets and a source line fit at full size; a longer list shrinks.
+  assets and a source line fit at full size. A longer list is never shrunk: assets with the same author and licence
+  share a row ("Portrait of Euler and 11 more"), and groups that still do not fit end in one "N more assets" row. Name
+  the files the episode shows, so the page lists what the viewer saw rather than every asset of the series.
 - `get_end_credits_page(source_lines, entries, get_text)` builds the same page as a mobject, if you need it elsewhere.
 - Preview it with `explainer-studio preview <episode> --end-credits` (`preview <episode>` with no options includes it);
   it writes `preview/end-credits/end-credits.png` at 1080p. Check that every external picture the episode shows is
