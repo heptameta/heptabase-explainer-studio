@@ -95,6 +95,14 @@ def test_code_panel_has_one_line_per_source_line_whatever_the_glyphs(kit):
             assert [len(line.submobjects) for line in panel.lines] == glyph_counts
 
 
+def test_text_in_the_code_font_has_one_glyph_per_letter_so_indexing_picks_the_letters_named(kit):
+    address = "https://progress.org"  # JetBrains Mono joins "//" into one glyph through contextual alternates
+    text = kit.manimlib.Text(address, font=kit.scene_kit.MONO_FONT)
+    assert "calt=0" in text.get_content_prefix_and_suffix(False)[0]
+    assert len(text.submobjects) == len(address)  # so text[8:10] is "pr", not "ro"
+    own = kit.manimlib.Text(address, font=kit.scene_kit.MONO_FONT, global_config={"font_features": "liga=1"})
+    assert "liga=1" in own.get_content_prefix_and_suffix(False)[0]  # a scene's own font_features are kept
+
 def test_expanding_an_inset_keeps_marks_made_before_it(kit):
     manimlib = kit.manimlib
     title = manimlib.Text("能量藏在高低差裡", font_size=48).shift(2 * manimlib.UP)

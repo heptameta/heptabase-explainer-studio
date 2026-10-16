@@ -7,7 +7,9 @@
 - CJK glyph outlines no longer grow thin spikes;
 - images are uploaded with mipmaps, so pictures shrunk far below their resolution do not sparkle;
 - text objects remember their size at construction (also through Transform), for the text_too_small check;
-- a curve's points are sampled and added all at once (every function graph, every frame of a redrawn one).
+- a curve's points are sampled and added all at once (every function graph, every frame of a redrawn one);
+- text with ligatures off also has contextual alternates off, so a font such as JetBrains Mono never joins letters
+  ("//") into one glyph and indexing the text picks the letters it names.
 
 Each patched upstream function is checked against a hash of its source: a ManimGL upgrade that changes one stops
 every render with a clear message instead of silently undoing a fix.
@@ -28,7 +30,7 @@ import subprocess
 import tempfile
 
 import numpy as np
-from manimlib import StringMobject, Transform, VMobject
+from manimlib import MarkupText, StringMobject, Transform, VMobject
 
 from .. import user_dirs
 
@@ -56,6 +58,7 @@ _UPSTREAM_SOURCE_HASH_BY_NAME_MAP = {
     "MarkupText.__init__": "8c4d146a82f0c0c5",
     "Text.__init__": "6588b32cd8edf646",
     "Code.__init__": "2f92d95179e87175",
+    "MarkupText.get_content_prefix_and_suffix": "cf3b3ece51c08b9a",
 }
 
 
@@ -347,6 +350,34 @@ def _sample_curves_at_once() -> None:
     ParametricCurve.init_points, CoordinateSystem.get_graph = init_points, get_graph
 
 
+# Every OpenType feature that can join or swap letters: with them all off, each character is its own glyph.
+NO_JOINED_LETTERS_FONT_FEATURES = "liga=0,dlig=0,clig=0,hlig=0,calt=0"
+
+
+def _keep_letters_apart() -> None:
+    """ManimGL turns ligatures off by default but leaves contextual alternates on, and some fonts join letters through
+    them: JetBrains Mono, the video's code font, draws "//" as one glyph, so in "https://..." every letter after it sits
+    one place earlier and `text[8:10]` picks the wrong two. Text with ligatures off gets contextual alternates off too,
+    unless the scene gives its own font_features."""
+    original = MarkupText.get_content_prefix_and_suffix
+    if getattr(original, "_is_letters_apart_patch", False):
+        return
+    _require_upstream_source("MarkupText.get_content_prefix_and_suffix", original)
+
+    def get_content_prefix_and_suffix(self, is_labelled: bool) -> tuple[str, str]:
+        if not self.disable_ligatures or "font_features" in self.global_config:
+            return original(self, is_labelled)
+        given_config = self.global_config
+        self.global_config = {**given_config, "font_features": NO_JOINED_LETTERS_FONT_FEATURES}
+        try:
+            return original(self, is_labelled)
+        finally:
+            self.global_config = given_config
+
+    get_content_prefix_and_suffix._is_letters_apart_patch = True
+    MarkupText.get_content_prefix_and_suffix = get_content_prefix_and_suffix
+
+
 _install_safe_latex()
 _install_glyph_repair()
 _enable_image_mipmaps()
@@ -354,3 +385,4 @@ _record_base_size(StringMobject)
 _carry_size_through_transform()
 _add_corners_at_once()
 _sample_curves_at_once()
+_keep_letters_apart()
