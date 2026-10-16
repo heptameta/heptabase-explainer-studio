@@ -6,6 +6,8 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-16
+
 ### Fixed
 
 - A narration line no longer leaves a low hum between sentences. Some voices keep up to a second of rumble after a
