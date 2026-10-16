@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
+from scipy import signal
 from scipy.io import wavfile
 
 from .. import user_dirs
@@ -29,6 +30,8 @@ MUSIC_UNDER_SPEECH_DECIBELS = -15.0
 DUCK_DECIBELS = -7.0
 LOUDNORM_TARGET_BY_PARAMETER_MAP = {"I": -16.0, "TP": -2.5, "LRA": 11.0}  # TP aimed 1 dB low: AAC encoding overshoots
 MAX_TRUE_PEAK_DECIBELS = -1.5
+# where speech has energy and the rumble a voice leaves in its pauses does not
+VOICE_BAND_FILTER = signal.butter(4, 300, "highpass", fs=SAMPLE_RATE_HERTZ, output="sos")
 
 
 def convert_decibels_to_gain(decibels: float) -> float:
@@ -99,14 +102,19 @@ def load_sound_samples(sound: TimelineSound, production_dir_path: Path) -> np.nd
 
 
 def clean_narration_line_edges(line: np.ndarray) -> np.ndarray:
-    """One narration line (mono) without a stray burst at its end, faded in and out so it starts and ends at zero.
+    """One narration line (mono) without a stray burst at its end or rumble after its last word, faded in and out so
+    it starts and ends at zero.
 
     A voice sometimes ends a line with silence and then the first tens of milliseconds of a breath or the next
     phrase, cut off mid-rise (ElevenLabs does, with the next line's text as context). Placed as is, that is a thump
     and a step: a pop between sentences, or a clipped "sh" when it runs past 80 ms. After at least 150 ms of silence at
     the very end, a sound of at most 80 ms is silenced, and so is one of up to 300 ms that is still getting louder at
-    the last sample (its last 10 ms within 6 dB of its loudest): speech that ends on its own fades out first. The line
-    keeps its length, so the timeline does not change.
+    the last sample (its last 10 ms within 6 dB of its loudest): speech that ends on its own fades out first.
+
+    A voice also often leaves up to a second of low rumble after its last word (ElevenLabs does, given both neighbors'
+    text), which the speech gain makes audible and the line's end then cuts off. So 80 ms after the last sound in the
+    voice band (above 300 Hz) the line fades to silence over 200 ms. The line keeps its length, so the timeline does
+    not change.
     """
     frame_length = SAMPLE_RATE_HERTZ // 100  # 10 ms
     frame_count = len(line) // frame_length
@@ -127,12 +135,43 @@ def clean_narration_line_edges(line: np.ndarray) -> np.ndarray:
         is_cut_off_rising = tail_frame_count > 0 and tail_rms[-1] >= tail_rms.max() * convert_decibels_to_gain(-6)
         if silence_frame_count >= 15 and (0 < tail_frame_count <= 8 or (tail_frame_count <= 30 and is_cut_off_rising)):
             end = (frame_count - tail_frame_count) * frame_length
+        last_voiced_frame_index = _find_last_voiced_frame_index(line[:end], frame_length)
+        if last_voiced_frame_index is not None:
+            pause_fade_start = (last_voiced_frame_index + 1) * frame_length + SAMPLE_RATE_HERTZ * 80 // 1000
+            if pause_fade_start < end:
+                pause_fade_length = min(end - pause_fade_start, SAMPLE_RATE_HERTZ * 200 // 1000)
+                line[pause_fade_start:pause_fade_start + pause_fade_length] *= np.square(
+                    np.linspace(1, 0, pause_fade_length, dtype=np.float32))
+                end = pause_fade_start + pause_fade_length
     line[end:] = 0
     fade_in_length = min(end, SAMPLE_RATE_HERTZ * 5 // 1000)
     fade_out_length = min(end, SAMPLE_RATE_HERTZ * 15 // 1000)
     line[:fade_in_length] *= np.linspace(0, 1, fade_in_length, dtype=np.float32)
     line[end - fade_out_length:end] *= np.linspace(1, 0, fade_out_length, dtype=np.float32)
     return line
+
+
+def _find_last_voiced_frame_index(line: np.ndarray, frame_length: int) -> int | None:
+    """The last 10 ms frame with sound in the voice band (above 300 Hz, at -60 dBFS or louder). A sound of at most
+    300 ms that runs to the line's end after at least 150 ms without one, still getting louder at the last frame,
+    does not count: it is the start of a breath or the next phrase, too quiet to be silenced as a burst, and it fades
+    out with the pause."""
+    frame_count = len(line) // frame_length
+    if not frame_count:
+        return None
+    voice_band = signal.sosfiltfilt(VOICE_BAND_FILTER, line)[:frame_count * frame_length]
+    voice_band_rms = np.sqrt(np.mean(np.square(voice_band.reshape(frame_count, frame_length), dtype=np.float64),
+                                     axis=1))
+    voiced_frame_indices = np.flatnonzero(voice_band_rms >= convert_decibels_to_gain(-60))
+    if not len(voiced_frame_indices):
+        return None
+    gap_positions = np.flatnonzero(np.diff(voiced_frame_indices) > 15)  # a gap of at least 150 ms
+    if voiced_frame_indices[-1] == frame_count - 1 and len(gap_positions):
+        last_run_start = voiced_frame_indices[gap_positions[-1] + 1]
+        last_run_rms = voice_band_rms[last_run_start:]
+        if len(last_run_rms) <= 30 and last_run_rms[-1] >= last_run_rms.max() * convert_decibels_to_gain(-6):
+            return int(voiced_frame_indices[gap_positions[-1]])
+    return int(voiced_frame_indices[-1])
 
 
 def _load_all(function, items: list) -> list:
