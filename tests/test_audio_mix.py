@@ -7,9 +7,10 @@ import numpy as np
 from explainer_studio.rendering.audio_mix import SAMPLE_RATE_HERTZ, clean_narration_line_edges
 
 
-def _tone(seconds: float, amplitude: float) -> np.ndarray:
+def _tone(seconds: float, amplitude: float, frequency_hertz: float = 440) -> np.ndarray:
+    """A stand-in for speech, which has energy in the voice band above 300 Hz."""
     index = np.arange(int(seconds * SAMPLE_RATE_HERTZ))
-    return (amplitude * np.sin(2 * np.pi * 220 * index / SAMPLE_RATE_HERTZ)).astype(np.float32)
+    return (amplitude * np.sin(2 * np.pi * frequency_hertz * index / SAMPLE_RATE_HERTZ)).astype(np.float32)
 
 
 def test_a_burst_after_the_lines_closing_silence_is_silenced_and_speech_to_the_end_is_kept():
@@ -36,3 +37,11 @@ def test_a_longer_burst_still_rising_at_the_end_is_silenced_but_a_last_word_that
     word_start = len(speech) + len(silence)
     assert np.allclose(cleaned[word_start + 1000:-SAMPLE_RATE_HERTZ * 15 // 1000],
                        fading_word[1000:-SAMPLE_RATE_HERTZ * 15 // 1000])
+
+
+def test_the_rumble_a_voice_leaves_after_its_last_word_fades_to_silence():
+    speech, rumble = _tone(0.5, 0.3), _tone(0.8, 0.003, frequency_hertz=60)
+    cleaned = clean_narration_line_edges(np.concatenate([speech, rumble]))
+    assert len(cleaned) == len(speech) + len(rumble)
+    assert np.allclose(cleaned[1000:len(speech)], speech[1000:])
+    assert not np.any(cleaned[len(speech) + SAMPLE_RATE_HERTZ * 280 // 1000 + 480:])

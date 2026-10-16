@@ -6,6 +6,12 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- A narration line no longer leaves a low hum between sentences. Some voices keep up to a second of rumble after a
+  line's last word, which the mix made audible and then cut off when the next line began; the pause after the last
+  word now fades to silence. Timing does not change and no narration is redone: render the episode again.
+
 ## [1.1.0] - 2026-10-16
 
 ### Added
