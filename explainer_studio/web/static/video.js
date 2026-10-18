@@ -1,9 +1,9 @@
 // The video page: the latest delivery of one episode, its comments, the survey (a rating, and the watch depth in dev
 // mode) and sharing with the team.
 // Keys: Space plays or pauses, the arrows move 5 s, M adds a comment (the video pauses; Enter saves and plays on,
-// Esc cancels), C turns subtitles on or off and T turns theater mode on or off. The video element is made once;
-// everything else is shown again from the server's JSON whenever feedback.json or the delivery changes, so the agent's
-// changes show up without a reload.
+// Esc cancels), C turns subtitles on or off, and T, O and W turn theater mode, the outline and the whiteboard on or
+// off. The video element is made once; everything else is shown again from the server's JSON whenever feedback.json or
+// the delivery changes, so the agent's changes show up without a reload.
 'use strict';
 
 const EPISODE_ID = BOOT.episodeId;
@@ -22,12 +22,20 @@ let editingCommentId = null;
 let isHandledOpen = false;
 let isOlderVideosOpen = false;
 let isRefreshPending = false;
-let isShowingSubtitles = (() => {
-  try { return localStorage.getItem('subtitles') === 'on'; } catch (error) { return false; }
-})();
-let isTheaterModeOn = (() => {
-  try { return localStorage.getItem('theaterMode') === 'on'; } catch (error) { return false; }
-})();
+
+// Whether a setting remembered for the next page is on.
+function loadIsOn(name) {
+  try { return localStorage.getItem(name) === 'on'; } catch (error) { return false; }
+}
+
+function saveIsOn(name, isOn) {
+  try { localStorage.setItem(name, isOn ? 'on' : 'off'); } catch (error) { /* private window */ }
+}
+
+let isShowingSubtitles = loadIsOn('subtitles');
+let isTheaterModeOn = loadIsOn('theaterMode');
+let isOutlineModeOn = loadIsOn('outlineMode');
+let isWhiteboardModeOn = loadIsOn('whiteboardMode');
 const nodes = {};
 
 async function fetchPageJson() {
@@ -40,6 +48,12 @@ async function fetchPageJson() {
   return result.isOk ? result.body : null;
 }
 
+// A button with only an icon, named by its tooltip, as the app's.
+function buildIconButton(iconName, label, attributes) {
+  return buildElement('button', {class: 'hb-icon-btn', type: 'button', 'aria-label': label, 'data-tooltip': label,
+    ...attributes}, buildIcon(iconName));
+}
+
 // Player ------------------------------------------------------------------------------------------------------------
 function applySubtitles() {
   if (video && video.textTracks.length) video.textTracks[0].mode = isShowingSubtitles ? 'showing' : 'hidden';
@@ -49,24 +63,1042 @@ function applySubtitles() {
 function toggleSubtitles() {
   if (!pageData.delivery.subtitles.length) return;
   isShowingSubtitles = !isShowingSubtitles;
-  try { localStorage.setItem('subtitles', isShowingSubtitles ? 'on' : 'off'); } catch (error) { /* private window */ }
+  saveIsOn('subtitles', isShowingSubtitles);
   applySubtitles();
 }
 
-// Theater mode: the video as large as the window allows, on a black band across the page, with the toolbar still in
-// view under it.
-function applyTheaterMode() {
-  document.body.classList.toggle('theater-mode', isTheaterModeOn);
-  if (nodes.theaterMode) nodes.theaterMode.setAttribute('aria-pressed', String(isTheaterModeOn));
+// Theater mode, the outline and the whiteboard ----------------------------------------------------------------------
+// Three buttons in the toolbar:
+// - theater mode: the video as large as the window allows, on a black band across the page, with the toolbar still
+//   in view under it;
+// - the outline: this episode's chapters (notes.yaml), each with its scenes (a key frame, a title, where it starts and
+//   its core idea), to jump to. It sits beside the video in a block as tall as it, or under the toolbar in theater
+//   mode and on a narrow window, so it never makes the video smaller;
+// - the whiteboard: the series' whiteboard (below) in place of the video, filling the page under the toolbar; with no
+//   video in view, the comment and subtitle buttons are off and the rest of the page is hidden. Theater mode and the
+//   outline come back as they were when it closes, and either of their buttons closes it.
+// Each is remembered for the next page.
+function checkIsOutlineAvailable() {
+  return Boolean(video && pageData.chapters);
+}
+
+function checkIsWhiteboardAvailable() {
+  return Boolean(video && whiteboard.page);
+}
+
+function checkIsWhiteboardModeShown() {
+  return isWhiteboardModeOn && checkIsWhiteboardAvailable();
+}
+
+function checkIsOutlineModeShown() {
+  return isOutlineModeOn && checkIsOutlineAvailable() && !checkIsWhiteboardModeShown();
+}
+
+function saveModes() {
+  saveIsOn('theaterMode', isTheaterModeOn);
+  saveIsOn('outlineMode', isOutlineModeOn);
+  saveIsOn('whiteboardMode', isWhiteboardModeOn);
+}
+
+function applyModes() {
+  const isWhiteboardShown = checkIsWhiteboardModeShown();
+  const isTheaterShown = Boolean(video) && isTheaterModeOn && !isWhiteboardShown;
+  const isOutlineAvailable = checkIsOutlineAvailable();
+  const isOutlineShown = checkIsOutlineModeShown();
+  document.body.classList.toggle('theater-mode', isTheaterShown);
+  document.body.classList.toggle('outline-mode', isOutlineShown);
+  document.body.classList.toggle('whiteboard-mode', isWhiteboardShown);
+  document.body.classList.toggle('outline-under-whiteboard',
+    isOutlineAvailable && isOutlineModeOn && isWhiteboardShown);
+  for (const [button, isShown, isAvailable] of [[nodes.theaterMode, isTheaterShown, true],
+    [nodes.outlineMode, isOutlineShown, isOutlineAvailable],
+    [nodes.whiteboardMode, isWhiteboardShown, checkIsWhiteboardAvailable()]]) {
+    if (!button) continue;
+    button.setAttribute('aria-pressed', String(isShown));
+    button.hidden = !isAvailable;
+  }
+  if (isWhiteboardShown && video && !video.paused) video.pause();
+  for (const button of [nodes.addComment, nodes.subtitles]) if (button) button.disabled = isWhiteboardShown;
+  // the whiteboard is the whole page and does not scroll, and a reload opens on it, not where the page was
+  history.scrollRestoration = isWhiteboardShown ? 'manual' : 'auto';
+  if (isWhiteboardShown) { window.scrollTo(0, 0); mountWhiteboard(); }
+  placeOutline();
+  showOutlineProgress();
 }
 
 function toggleTheaterMode() {
   if (!video) return;
-  isTheaterModeOn = !isTheaterModeOn;
-  try { localStorage.setItem('theaterMode', isTheaterModeOn ? 'on' : 'off'); } catch (error) { /* private window */ }
-  applyTheaterMode();
+  isTheaterModeOn = checkIsWhiteboardModeShown() || !isTheaterModeOn;
+  isWhiteboardModeOn = false;
+  saveModes();
+  applyModes();
   if (isTheaterModeOn) video.scrollIntoView({block: 'start'});
 }
+
+function toggleOutlineMode() {
+  if (!checkIsOutlineAvailable()) return;
+  isOutlineModeOn = checkIsWhiteboardModeShown() || !isOutlineModeOn;
+  isWhiteboardModeOn = false;
+  saveModes();
+  applyModes();
+}
+
+function toggleWhiteboardMode() {
+  if (!checkIsWhiteboardAvailable()) return;
+  isWhiteboardModeOn = !checkIsWhiteboardModeShown();
+  saveModes();
+  applyModes();
+}
+
+function openWhiteboardMode() {
+  if (!checkIsWhiteboardModeShown()) toggleWhiteboardMode();
+}
+
+let outlineJson = null;
+let currentOutlineRow = null;  // the row of the scene the video is in
+// Beside the video when the window has room for both, unless theater mode keeps the width for the video.
+const WIDE_WINDOW_QUERY = window.matchMedia('(min-width: 960px)');
+
+function getMediaUrl(name) {
+  return `${BOOT.baseUrl}/media/${EPISODE_ID}/${name}`;
+}
+
+function getFrameUrl(beatId) {
+  return getMediaUrl(`frames/${encodeURIComponent(beatId)}.jpg`);
+}
+
+function checkIsOutlineBesideVideo() {
+  return Boolean(nodes.outline) && nodes.outline.parentNode === nodes.videoHome;
+}
+
+function placeOutline() {
+  if (!nodes.outline || !video) return;
+  if (!isTheaterModeOn && WIDE_WINDOW_QUERY.matches) {
+    if (!checkIsOutlineBesideVideo()) nodes.videoHome.append(nodes.outline);
+  } else if (nodes.outline.previousElementSibling !== nodes.composer) {
+    nodes.composer.after(nodes.outline);
+  }
+}
+
+WIDE_WINDOW_QUERY.addEventListener('change', placeOutline);
+
+// Plays from a scene's start. Under the toolbar, the outline brings the video back into view first.
+function playFrom(seconds) {
+  if (!video) return;
+  video.currentTime = seconds;
+  video.play();
+  if (!checkIsOutlineBesideVideo()) video.scrollIntoView({block: 'nearest'});
+}
+
+// The scene the video is in, with how far into it, whether it plays or not.
+function showOutlineProgress() {
+  if (!nodes.outlineRows) return;
+  const seconds = video ? video.currentTime : 0;
+  let currentRow = null;
+  for (const {scene, row, bar} of nodes.outlineRows) {
+    const isCurrent = seconds >= scene.startSeconds && seconds < scene.endSeconds;
+    row.classList.toggle('current', isCurrent);
+    bar.style.width = isCurrent
+      ? `${(100 * (seconds - scene.startSeconds) / (scene.endSeconds - scene.startSeconds)).toFixed(1)}%` : '0';
+    if (isCurrent) currentRow = row;
+  }
+  if (currentRow === currentOutlineRow) return;
+  currentOutlineRow = currentRow;
+  if (currentRow) keepOutlineRowInView(currentRow);
+}
+
+// Beside the video, the outline scrolls by itself to the scene the video moves into, unless the pointer is on it,
+// where the user may be reading another chapter. Under the toolbar it leaves the page where it is.
+function keepOutlineRowInView(row) {
+  const scroller = nodes.outlineScroller;
+  if (!checkIsOutlineBesideVideo() || !checkIsOutlineModeShown() || scroller.matches(':hover')) return;
+  const headHeight = row.closest('.chapter').querySelector('.chapter-head').offsetHeight;
+  const top = row.offsetTop - headHeight;
+  if (top < scroller.scrollTop || row.offsetTop + row.offsetHeight > scroller.scrollTop + scroller.clientHeight) {
+    scroller.scrollTop = top;
+  }
+}
+
+function buildOutline(chapters) {
+  nodes.outlineRows = [];
+  nodes.chapterWhiteboardButtons = [];
+  currentOutlineRow = null;
+  const chapterNodes = chapters.map((chapter, chapterIndex) => {
+    const first = chapter.scenes[0], last = chapter.scenes[chapter.scenes.length - 1];
+    const minutes = Math.max(1, Math.round((last.endSeconds - first.startSeconds) / 60));
+    const rows = chapter.scenes.map((scene) => {
+      const bar = buildElement('i', {});
+      const row = buildElement('div', {class: 'scene', role: 'button', tabindex: '0',
+        onclick: () => playFrom(scene.startSeconds),
+        onkeydown: (event) => {
+          if (event.key === 'Enter') { event.preventDefault(); playFrom(scene.startSeconds); }
+        }},
+      buildElement('div', {class: 'thumb'}, buildElement('img', {src: getFrameUrl(scene.keyFrame), alt: '',
+        loading: 'lazy'}), buildElement('span', {class: 'bar'}, bar)),
+      buildElement('div', {class: 'body'},
+        buildElement('div', {class: 'title'}, buildElement('b', {}, scene.title),
+          buildElement('span', {class: 'hb-meta'}, formatTime(scene.startSeconds))),
+        buildElement('p', {}, scene.summary)));
+      nodes.outlineRows.push({scene, row, bar});
+      return row;
+    });
+    const whiteboardButton = buildIconButton('whiteboard', translate('chapters.viewOnWhiteboard'),
+      {hidden: true, onclick: () => showChapterOnWhiteboard(chapter.id)});
+    nodes.chapterWhiteboardButtons.push(whiteboardButton);
+    return buildElement('section', {class: 'chapter'},
+      buildElement('div', {class: 'chapter-head'},
+        buildElement('h3', {},
+          buildElement('span', {class: 'number'}, translate('chapters.chapter', {number: chapterIndex + 1})),
+          chapter.title),
+        buildElement('span', {class: 'hb-meta'}, translate('chapters.minutes', {minutes})),
+        whiteboardButton),
+      buildElement('div', {class: 'scenes'}, rows));
+  });
+  nodes.outlineScroller.replaceChildren(...chapterNodes);
+  showChapterWhiteboardButtons();
+}
+
+function showOutline() {
+  const json = JSON.stringify(pageData.chapters);
+  if (json === outlineJson) return;
+  outlineJson = json;
+  if (pageData.chapters) {
+    buildOutline(pageData.chapters);
+  } else {
+    nodes.outlineRows = null;
+    nodes.outlineScroller.replaceChildren();
+  }
+  applyModes();
+}
+
+// Series whiteboard ------------------------------------------------------------------------------------------------
+// The series' whiteboard is the Heptabase web app's embedded whiteboard page in an iframe. Studio lays the
+// cards out and Heptabase draws them: the embedded page measures the cards (only Heptabase's renderer knows how tall
+// a card is), this page lays them out by the rules below, and the embedded page shows them. Until the user saves, that
+// preview stays on this computer.
+// Saving takes this tab to Heptabase's sign-in when needed and back (`SIGN_IN_QUERY_NAME` names the sign-in; the same
+// tab, not a new one, because some browsers, the Claude app's, would open a new window in the same tab), and the save
+// goes on by itself. The page server then puts every episode on a new whiteboard in the user's Heptabase. Once saved,
+// the embedded page reads the whiteboard itself, with an access token; when the page opens, the episodes delivered
+// since are laid out under everything on the whiteboard and added, the iframe loading in the background for that.
+// Heptabase draws what it holds from then on, including what the user changed there.
+const SIGN_IN_QUERY_NAME = 'heptabaseSignIn';
+// The layout rules (Studio's, and expected to change): episodes one under the next; in an episode, its chapters side
+// by side, coloured in turn; in a chapter, a column per scene; in a column, a card one row below the cards of the
+// column that lead to it, each row centred. Heptabase draws a section's title above its box, so a section needs no
+// room inside for it.
+const WHITEBOARD_LAYOUT = {cardWidth: 520, episodeGap: 360, episodePadding: 40, chapterGap: 120, chapterPadding: 40,
+  sceneGap: 64, rowGap: 64};
+const CHAPTER_COLOR_NAMES = ['blue', 'yellow', 'green', 'purple'];
+const FRAME_READY_TIMEOUT_MILLISECONDS = 30000;
+const MEASURE_TIMEOUT_MILLISECONDS = 30000;
+const whiteboard = {
+  page: null,  // the page server's api/series-whiteboard
+  frame: null,
+  origin: null,
+  isFrameReady: false,
+  frameReadyTimerId: null,
+  view: 'loading',  // what the whiteboard shows: loading | preview | saved | unreadable | empty
+  unreadableReason: null,  // trashed | deleted | forbidden | signedOut | unauthorized | network | notMeasured
+  previewLayout: null,
+  shownWhiteboard: null,  // {title, spaceId, contentBounds} of the saved whiteboard on show
+  signInStatus: null,  // how the sign-in this page came back from ended, until the next save
+  isSaveRequested: false,  // back from a sign-in that a save started: save once the preview is laid out
+  isSaving: false,
+  saveFailure: null,
+  isImporting: false,
+  hasFocusedDuringImport: false,  // the user chose a section while episodes were being added
+  importFailure: null,
+  hasImportStarted: false,  // the episodes to add are added once per page load, then only with Retry
+  // The section ({episodeId, chapterId}) the embedded page's first whiteboard opens on: this episode's, or a chapter's
+  // chosen before the whiteboard showed; null once a whiteboard has shown. Later whiteboards keep the viewport, and
+  // focusObject moves it.
+  focusSection: {episodeId: EPISODE_ID, chapterId: null},
+  hasAskedToShow: false,  // the embedded page was sent showObjects or showWhiteboard
+  lastRequestNumber: 0,
+  // What to do with the reply to each request sent and not answered yet, by its requestId, which the reply repeats:
+  // measureCards, showWhiteboard and refreshWhiteboard. A reply to no request here is ignored.
+  replyHandlerByRequestIdMap: new Map(),
+  loadedImageByKeyMap: new Map(),  // {version, blob} of each picture fetched
+};
+
+async function fetchWhiteboardPage(signInId) {
+  const query = signInId ? `?signInId=${encodeURIComponent(signInId)}` : '';
+  const result = await callApi('GET', `/api/series-whiteboard${query}`);
+  return result.isOk ? result.body : null;
+}
+
+// The page server's whiteboard data as it is now; the last one stays when it cannot be read.
+async function refetchWhiteboardPage() {
+  whiteboard.page = (await fetchWhiteboardPage()) || whiteboard.page;
+}
+
+function postToWhiteboard(message) {
+  if (whiteboard.isFrameReady) whiteboard.frame.contentWindow.postMessage(message, whiteboard.origin);
+}
+
+// A message that gets a reply, under a new requestId; `handleReply` takes the reply. Returns the requestId, or null
+// when the embedded page is not ready to take it.
+function postRequestToWhiteboard(message, handleReply) {
+  if (!whiteboard.isFrameReady) return null;
+  whiteboard.lastRequestNumber += 1;
+  const requestId = String(whiteboard.lastRequestNumber);
+  whiteboard.replyHandlerByRequestIdMap.set(requestId, handleReply);
+  postToWhiteboard({...message, requestId});
+  return requestId;
+}
+
+// Moves the viewport to a section the user chose. Chosen while episodes are being added, it stays after they are.
+function focusWhiteboardOnUserChoice(focusTarget) {
+  if (whiteboard.isImporting) whiteboard.hasFocusedDuringImport = true;
+  postToWhiteboard({type: 'focusObject', focusTarget});
+}
+
+// The episodes on the whiteboard: those saved, or those in the preview.
+function listWhiteboardEpisodeIds() {
+  const page = whiteboard.page;
+  return page.savedWhiteboard ? page.savedWhiteboard.importedEpisodeIds
+    : page.episodesToAdd.map((episode) => episode.id);
+}
+
+// A chapter section's whiteboard key; an episode's section has the episode's id.
+function getChapterSectionKey(episodeId, chapterId) {
+  return `${episodeId}/${chapterId}`;
+}
+
+// How the embedded page finds an episode's or a chapter's section: in the preview by its key, on the saved whiteboard
+// by the id Heptabase has for it. A chapter the saved whiteboard has no section for (the episode's chapters changed
+// after it was added) falls back to its episode; none when the whiteboard has neither.
+function resolveWhiteboardFocusTarget({episodeId, chapterId}) {
+  const chapterKey = chapterId ? getChapterSectionKey(episodeId, chapterId) : null;
+  const savedWhiteboard = whiteboard.page.savedWhiteboard;
+  if (!savedWhiteboard) return {key: chapterKey || episodeId};
+  const sectionId = (chapterKey && savedWhiteboard.sectionIdByKeyMap[chapterKey])
+    || savedWhiteboard.sectionIdByKeyMap[episodeId];
+  return sectionId ? {objectId: sectionId} : undefined;
+}
+
+// showObjects or showWhiteboard. Until a whiteboard has shown, it opens on `focusSection`, or on the last episode when
+// that section's episode is not on the whiteboard; the embedded page opens on everything when it has none of them.
+// Shown means sent for showObjects, which has no answer, and whiteboardShown for showWhiteboard, so a whiteboard that
+// could not be read still opens there when it is read again.
+function postShowToWhiteboard(message) {
+  if (!whiteboard.isFrameReady) return;
+  const focusSection = whiteboard.focusSection;
+  const episodeIds = listWhiteboardEpisodeIds();
+  const focusTarget = !focusSection || !episodeIds.length ? undefined
+    : resolveWhiteboardFocusTarget(episodeIds.includes(focusSection.episodeId) ? focusSection
+      : {episodeId: episodeIds.at(-1), chapterId: null});
+  whiteboard.hasAskedToShow = true;
+  if (message.type === 'showObjects') {
+    whiteboard.focusSection = null;
+    postToWhiteboard({...message, focusTarget});
+  } else {
+    postRequestToWhiteboard({...message, focusTarget}, handleWhiteboardReadReply);
+  }
+}
+
+// A chapter's "View on whiteboard", there only when this episode is on the whiteboard.
+function showChapterWhiteboardButtons() {
+  const isOnWhiteboard = Boolean(whiteboard.page) && listWhiteboardEpisodeIds().includes(EPISODE_ID);
+  for (const button of nodes.chapterWhiteboardButtons || []) button.hidden = !isOnWhiteboard;
+}
+
+// The whiteboard view, on the chapter's section. Before a whiteboard has shown, the first one opens there; a
+// focusObject also follows a show already sent, which the embedded page handles in order.
+function showChapterOnWhiteboard(chapterId) {
+  const focusSection = {episodeId: EPISODE_ID, chapterId};
+  openWhiteboardMode();
+  if (whiteboard.focusSection) whiteboard.focusSection = focusSection;
+  if (!whiteboard.hasAskedToShow) return;
+  const focusTarget = resolveWhiteboardFocusTarget(focusSection);
+  if (focusTarget) focusWhiteboardOnUserChoice(focusTarget);
+}
+
+function formatEpisodeNumbers(episodes) {
+  return episodes.map((episode) => episode.number)
+    .join(document.documentElement.lang.startsWith('zh') ? '、' : ', ');
+}
+
+function listEpisodeCards(episodes) {
+  return episodes.flatMap((episode) => episode.chapters.flatMap((chapter) =>
+    chapter.scenes.flatMap((scene) => scene.cards)));
+}
+
+// The cards' pictures as Blobs, each fetched once per version.
+async function loadWhiteboardImages() {
+  const isLoaded = (image) => whiteboard.loadedImageByKeyMap.get(image.key)?.version === image.version;
+  await Promise.all(whiteboard.page.images.filter((image) => !isLoaded(image)).map(async (image) => {
+    const response = await fetch(BOOT.baseUrl + image.url, {cache: 'no-store'}).catch(() => null);
+    if (response && response.ok) {
+      whiteboard.loadedImageByKeyMap.set(image.key, {version: image.version, blob: await response.blob()});
+    }
+  }));
+  return whiteboard.page.images.filter(isLoaded)
+    .map((image) => ({key: image.key, blob: whiteboard.loadedImageByKeyMap.get(image.key).blob}));
+}
+
+// The cards' heights as Heptabase draws them at the layout's card width: {heights}, or {failure} when the embedded
+// page did not answer (network) or could not draw a card (notMeasured).
+function measureCards(episodes, images) {
+  const cards = listEpisodeCards(episodes);
+  return new Promise((resolve) => {
+    let timerId = null;
+    const requestId = postRequestToWhiteboard({type: 'measureCards', cardWidth: WHITEBOARD_LAYOUT.cardWidth,
+      cards: cards.map((card) => ({key: card.key, content: card.content})), files: images}, (reply) => {
+      clearTimeout(timerId);
+      const heights = reply.heights || {};
+      resolve(cards.every((card) => heights[card.key] > 0) ? {heights} : {failure: 'notMeasured'});
+    });
+    timerId = setTimeout(() => {
+      whiteboard.replyHandlerByRequestIdMap.delete(requestId);
+      resolve({failure: 'network'});
+    }, MEASURE_TIMEOUT_MILLISECONDS);
+  });
+}
+
+// A scene's cards in rows: a card goes one row below the latest of the scene's earlier cards that lead to it, so that
+// an argument reads downwards and a claim's cases sit side by side.
+function findCardRows(cards) {
+  const rowByKeyMap = new Map();
+  for (const card of cards) {
+    const sourceRows = cards.filter((source) => rowByKeyMap.has(source.key) && source.leadsTo.includes(card.key))
+      .map((source) => rowByKeyMap.get(source.key));
+    rowByKeyMap.set(card.key, sourceRows.length ? Math.max(...sourceRows) + 1 : 0);
+  }
+  const rows = [];
+  for (const card of cards) (rows[rowByKeyMap.get(card.key)] ||= []).push(card);
+  return rows.filter(Boolean);
+}
+
+// The episodes laid out from (originX, originY) down, by their whiteboard keys. The arrows are the cards' leadsTo
+// (down a scene's column: straight when the cards line up, else an elbow; to another column: a curve from side to
+// side) and continuesFrom (from another episode: a curve from bottom to top).
+function layoutWhiteboardEpisodes(episodes, heights, originX, originY) {
+  const rules = WHITEBOARD_LAYOUT;
+  const sections = [], cards = [], connections = [];
+  const sceneKeyByCardKeyMap = new Map();
+  let y = originY;
+  for (const episode of episodes) {
+    const episodeSection = {key: episode.id, parentSectionKey: null, title: episode.sectionTitle, color: null,
+      x: originX, y};
+    sections.push(episodeSection);
+    const chapterY = y + rules.episodePadding;
+    let chapterX = originX + rules.episodePadding, tallestChapter = 0;
+    episode.chapters.forEach((chapter, chapterIndex) => {
+      const chapterSection = {key: getChapterSectionKey(episode.id, chapter.id), parentSectionKey: episode.id,
+        title: chapter.title,
+        color: CHAPTER_COLOR_NAMES[chapterIndex % CHAPTER_COLOR_NAMES.length], x: chapterX, y: chapterY};
+      sections.push(chapterSection);
+      let columnX = chapterX + rules.chapterPadding, tallestColumn = 0;
+      for (const scene of chapter.scenes) {
+        const rows = findCardRows(scene.cards);
+        const findRowWidth = (row) => row.length * rules.cardWidth + (row.length - 1) * rules.sceneGap;
+        const columnWidth = Math.max(...rows.map(findRowWidth));
+        let rowY = chapterY + rules.chapterPadding;
+        for (const row of rows) {
+          let cardX = columnX + (columnWidth - findRowWidth(row)) / 2, rowHeight = 0;
+          for (const card of row) {
+            const height = Math.ceil(heights[card.key]);
+            cards.push({key: card.key, sectionKey: chapterSection.key, color: card.color || null,
+              content: card.content, x: cardX, y: rowY, width: rules.cardWidth, height});
+            sceneKeyByCardKeyMap.set(card.key, `${episode.id}/${scene.id}`);
+            cardX += rules.cardWidth + rules.sceneGap;
+            rowHeight = Math.max(rowHeight, height);
+          }
+          rowY += rowHeight + rules.rowGap;
+        }
+        tallestColumn = Math.max(tallestColumn, rowY - rules.rowGap - (chapterY + rules.chapterPadding));
+        columnX += columnWidth + rules.sceneGap;
+      }
+      chapterSection.width = columnX - rules.sceneGap + rules.chapterPadding - chapterX;
+      chapterSection.height = tallestColumn + 2 * rules.chapterPadding;
+      tallestChapter = Math.max(tallestChapter, chapterSection.height);
+      chapterX += chapterSection.width + rules.chapterGap;
+    });
+    episodeSection.width = chapterX - rules.chapterGap + rules.episodePadding - originX;
+    episodeSection.height = tallestChapter + 2 * rules.episodePadding;
+    y += episodeSection.height + rules.episodeGap;
+  }
+  const cardByKeyMap = new Map(cards.map((card) => [card.key, card]));
+  for (const card of listEpisodeCards(episodes)) {
+    for (const endKey of card.leadsTo) {
+      const begin = cardByKeyMap.get(card.key), end = cardByKeyMap.get(endKey);
+      const isSameColumn = sceneKeyByCardKeyMap.get(card.key) === sceneKeyByCardKeyMap.get(endKey);
+      connections.push({key: `${card.key}->${endKey}`, beginKey: card.key, endKey, ...(isSameColumn
+        ? {type: begin.x === end.x ? 'straight' : 'elbow', beginPos: 'bottom', endPos: 'top'}
+        : {type: 'curve', beginPos: 'right', endPos: 'left'})});
+    }
+    for (const beginKey of card.continuesFrom) {
+      connections.push({key: `${beginKey}->${card.key}`, beginKey, endKey: card.key, type: 'curve',
+        beginPos: 'bottom', endPos: 'top'});
+    }
+  }
+  return {sections, cards, connections};
+}
+
+// What the page server needs to add the episodes: where each object went, by its whiteboard key, and which version of
+// the cards was laid out. It reads the cards themselves from notes.yaml, and refuses a layout of other cards.
+function buildImportRequest(episodes, layout) {
+  return {
+    episodeIds: episodes.map((episode) => episode.id),
+    cardsVersion: whiteboard.page.cardsVersion,
+    sections: layout.sections.map(({key, color, x, y, width, height}) => ({key, color, x, y, width, height})),
+    cards: layout.cards.map(({key, x, y, width, height}) => ({key, x, y, width, height})),
+    connections: layout.connections.map(({key, type, beginPos, endPos}) => ({key, type, beginPos, endPos})),
+  };
+}
+
+// Why a save or an import did not go through, in the page's language; the page server's English reason goes in the
+// line's tooltip, for whoever debugs it.
+// The failures that have a reason of their own: those found on this computer (a card Heptabase could not draw among
+// them), and the subscription.
+const WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP = {
+  not_measured: 'video.whiteboard.reason.notMeasured',
+  cards_changed: 'video.whiteboard.reason.cardsChanged',
+  picture_unusable: 'video.whiteboard.reason.pictureUnusable',
+  busy: 'video.whiteboard.reason.busy',
+  other_account: 'video.whiteboard.reason.otherAccount',
+  subscription_required: 'video.whiteboard.reason.subscriptionRequired',
+};
+
+function describeWhiteboardFailure(result) {
+  const code = result.body.code;
+  const reasonKey = WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP[code];
+  const reason = reasonKey ? translate(reasonKey)
+    : !result.status || code === 'not_sent' ? translate('video.whiteboard.reason.notReached')
+      : translate('video.whiteboard.reason.refused', {code: code || `HTTP ${result.status}`});
+  return {code, reason, details: [result.body.message, ...(result.body.details || [])].filter(Boolean).join(' · ')};
+}
+
+// The preview: the episodes that can go on the whiteboard, laid out from the top left. Nothing leaves the computer.
+async function showWhiteboardPreview() {
+  const episodes = whiteboard.page.episodesToAdd;
+  whiteboard.previewLayout = null;
+  if (!episodes.length) { whiteboard.view = 'empty'; showWhiteboardToolbar(); return; }
+  whiteboard.view = 'loading';
+  showWhiteboardToolbar();
+  const images = await loadWhiteboardImages();
+  const measurement = await measureCards(episodes, images);
+  if (measurement.failure) { showUnreadableWhiteboard(measurement.failure); return; }
+  whiteboard.previewLayout = layoutWhiteboardEpisodes(episodes, measurement.heights, 0, 0);
+  postShowToWhiteboard({type: 'showObjects', title: whiteboard.page.title, ...whiteboard.previewLayout,
+    files: images});
+  whiteboard.view = 'preview';
+  showWhiteboardToolbar();
+  if (whiteboard.isSaveRequested) saveWhiteboard();
+}
+
+// Takes this tab to Heptabase's sign-in; Heptabase sends it back to this page, where `finishSignIn` picks up.
+async function signInToHeptabase() {
+  const returnUrl = new URL(window.location.href);
+  returnUrl.searchParams.delete(SIGN_IN_QUERY_NAME);
+  const result = await callApi('POST', '/api/series-whiteboard/sign-in',
+    {returnPath: returnUrl.pathname + returnUrl.search});
+  if (!result.isOk) {
+    whiteboard.saveFailure = describeWhiteboardFailure(result);
+    showWhiteboardToolbar();
+    if (whiteboard.view !== 'preview') showToast(translate('video.whiteboard.signInFailed'));
+    return;
+  }
+  window.location.assign(result.body.authorizationUrl);
+}
+
+async function saveWhiteboard() {
+  whiteboard.isSaveRequested = false;
+  if (!whiteboard.previewLayout || whiteboard.isSaving) return;
+  whiteboard.signInStatus = null;
+  whiteboard.saveFailure = null;
+  if (!whiteboard.page.signedInEmail) { await signInToHeptabase(); return; }
+  whiteboard.isSaving = true;
+  showWhiteboardToolbar();
+  const result = await callApi('POST', '/api/series-whiteboard/import',
+    buildImportRequest(whiteboard.page.episodesToAdd, whiteboard.previewLayout));
+  whiteboard.isSaving = false;
+  if (result.status === 401) { await signInToHeptabase(); return; }  // the stored sign-in is no longer accepted
+  if (result.body.code === 'cards_changed') {  // the preview shows the cards as they are now; the user saves again
+    await refetchWhiteboardPage();
+    await showWhiteboardPreview();
+  }
+  if (!result.isOk) {
+    whiteboard.saveFailure = describeWhiteboardFailure(result);
+    showWhiteboardToolbar();
+    return;
+  }
+  await refetchWhiteboardPage();
+  await showSavedWhiteboard();
+}
+
+async function fetchWhiteboardAccessToken() {
+  const result = await callApi('GET', '/api/series-whiteboard/access-token');
+  if (result.isOk) return result.body.accessToken;
+  showUnreadableWhiteboard(result.status === 401 ? findSignInRequiredReason(result) : 'network');
+  return null;
+}
+
+// A 401 from the page server, which reads the stored sign-in at that moment: Heptabase no longer accepts it, or this
+// computer is signed out.
+function findSignInRequiredReason(result) {
+  return result.body.code === 'sign_in_expired' ? 'unauthorized' : 'signedOut';
+}
+
+// The saved whiteboard, read by the embedded page; it answers whiteboardShown or failed.
+async function showSavedWhiteboard() {
+  if (!whiteboard.page.savedWhiteboard) { await showWhiteboardPreview(); return; }
+  const accessToken = await fetchWhiteboardAccessToken();
+  if (!accessToken) return;
+  postShowToWhiteboard({type: 'showWhiteboard', whiteboardId: whiteboard.page.savedWhiteboard.whiteboardId,
+    accessToken});
+}
+
+// Reads the saved whiteboard again, with a fresh access token: after an import, on the first episode added unless the
+// user chose a section meanwhile, and when the page comes back to the foreground, keeping the viewport. A whiteboard
+// that could not be read is tried again from the start (it may be back from the trash).
+async function refreshSavedWhiteboard(focusEpisodeId) {
+  if (!whiteboard.page || !whiteboard.isFrameReady || whiteboard.isSaving || whiteboard.isImporting) return;
+  if (!['saved', 'unreadable'].includes(whiteboard.view)) return;
+  await refetchWhiteboardPage();
+  if (!whiteboard.page.savedWhiteboard) { await showWhiteboardPreview(); return; }
+  if (whiteboard.view === 'unreadable') { await showSavedWhiteboard(); return; }
+  const accessToken = await fetchWhiteboardAccessToken();
+  if (!accessToken) return;
+  postToWhiteboard({type: 'updateAccessToken', accessToken});
+  const focusTarget = focusEpisodeId ? resolveWhiteboardFocusTarget({episodeId: focusEpisodeId, chapterId: null})
+    : undefined;
+  postRequestToWhiteboard({type: 'refreshWhiteboard', focusTarget}, handleWhiteboardReadReply);
+}
+
+// Lays out the episodes to add, as the page server has them now, under everything on the whiteboard, left-aligned
+// with it, and adds them; laid out again once when the cards changed meanwhile.
+async function sendNewEpisodes() {
+  for (let attempt = 1; ; attempt += 1) {
+    await refetchWhiteboardPage();
+    const episodes = whiteboard.page.episodesToAdd;
+    if (!episodes.length) return {isOk: true, status: 200, body: {}};
+    const images = await loadWhiteboardImages();
+    const measurement = await measureCards(episodes, images);
+    if (measurement.failure) {
+      return {isOk: false, status: 0,
+        body: {code: measurement.failure === 'notMeasured' ? 'not_measured' : 'not_sent'}};
+    }
+    const bounds = whiteboard.shownWhiteboard.contentBounds;
+    const result = await callApi('POST', '/api/series-whiteboard/import', buildImportRequest(episodes,
+      layoutWhiteboardEpisodes(episodes, measurement.heights, bounds ? bounds.x : 0,
+        bounds ? bounds.y + bounds.height + WHITEBOARD_LAYOUT.episodeGap : 0)));
+    if (result.body.code !== 'cards_changed' || attempt === 2) return result;
+  }
+}
+
+// Adds the episodes delivered since. The whiteboard shows what it holds while they go; they show once Heptabase has
+// them.
+async function importNewEpisodes() {
+  if (!whiteboard.page.episodesToAdd.length || whiteboard.isImporting) return;
+  whiteboard.hasImportStarted = true;
+  whiteboard.isImporting = true;
+  whiteboard.hasFocusedDuringImport = false;
+  whiteboard.importFailure = null;
+  showWhiteboardToolbar();
+  const result = await sendNewEpisodes();
+  const addedEpisodeId = whiteboard.page.episodesToAdd[0]?.id;  // the page sendNewEpisodes laid out last
+  whiteboard.isImporting = false;
+  if (result.status === 401) { showUnreadableWhiteboard(findSignInRequiredReason(result)); return; }
+  if (result.body.code === 'whiteboard_trashed' || result.body.code === 'whiteboard_deleted') {
+    showUnreadableWhiteboard(result.body.code === 'whiteboard_trashed' ? 'trashed' : 'deleted');
+    return;
+  }
+  if (!result.isOk) {
+    whiteboard.importFailure = describeWhiteboardFailure(result);
+    showWhiteboardToolbar();
+    return;
+  }
+  await refreshSavedWhiteboard(whiteboard.hasFocusedDuringImport ? undefined : addedEpisodeId);
+}
+
+// The cards changed on this computer (the page's digest moved): the preview lays out the cards as they are now. A
+// saved whiteboard only takes in which episodes are still to add; they are added when a page opens, or with Retry.
+async function refreshWhiteboardCards() {
+  if (!whiteboard.frame || !whiteboard.page || whiteboard.isSaving || whiteboard.isImporting) return;
+  if (!['preview', 'empty', 'saved'].includes(whiteboard.view)) return;
+  const page = await fetchWhiteboardPage();
+  if (!page || page.cardsVersion === whiteboard.page.cardsVersion) return;
+  whiteboard.page = page;
+  if (whiteboard.view === 'saved') { showWhiteboardToolbar(); return; }
+  if (!page.savedWhiteboard) await showWhiteboardPreview();
+}
+
+function showUnreadableWhiteboard(reason) {
+  whiteboard.view = 'unreadable';
+  whiteboard.unreadableReason = reason;
+  showWhiteboardToolbar();
+}
+
+async function unlinkWhiteboard() {
+  const result = await callApi('POST', '/api/series-whiteboard/unlink');
+  if (!result.isOk) { showToast(translate('common.error.unknown')); return; }
+  await refetchWhiteboardPage();
+  Object.assign(whiteboard, {shownWhiteboard: null, importFailure: null, saveFailure: null, hasImportStarted: false});
+  await showWhiteboardPreview();
+}
+
+// A dialog that asks before doing something: `contents`, then Cancel and `confirmButton`, a submit button that closes
+// it and calls `confirm`. Opened again while open, it shows the new contents.
+function openConfirmDialog(contents, confirmButton, confirm) {
+  const form = buildElement('form', {method: 'dialog'}, ...contents,
+    buildElement('div', {class: 'buttons'},
+      buildElement('button', {class: 'hb-btn text', type: 'button', onclick: () => nodes.dialog.close()},
+        translate('common.cancel')),
+      confirmButton));
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    nodes.dialog.close();
+    confirm();
+  });
+  nodes.dialog.replaceChildren(form);
+  if (!nodes.dialog.open) nodes.dialog.showModal();
+}
+
+function confirmUnlinkWhiteboard() {
+  openConfirmDialog([buildElement('h3', {}, translate('video.whiteboard.unlinkConfirm.title')),
+    buildElement('p', {class: 'lead'}, translate('video.whiteboard.unlinkConfirm.body'))],
+  buildElement('button', {class: 'hb-btn fill danger', type: 'submit'}, translate('video.whiteboard.unlink')),
+  unlinkWhiteboard);
+}
+
+// Signs this computer out of Heptabase, for every series. The links stay, so a saved whiteboard then needs a sign-in.
+async function signOutOfHeptabase() {
+  const result = await callApi('POST', '/api/series-whiteboard/sign-out');
+  if (!result.isOk) {
+    showToast(translate('video.whiteboard.signOutFailed', {reason: describeWhiteboardFailure(result).reason}));
+    return false;
+  }
+  await refetchWhiteboardPage();
+  if (whiteboard.page.savedWhiteboard) showUnreadableWhiteboard('signedOut'); else showWhiteboardToolbar();
+  return true;
+}
+
+// Before a series' first save: what saving does, and the account it goes to. Signed out, the button signs in first
+// (the save then goes on by itself when the sign-in comes back). Signing out here leaves the dialog open, asking for a
+// sign-in. The page data is read again first: another series' page may have signed in or out since.
+async function confirmSaveWhiteboard() {
+  await refetchWhiteboardPage();
+  const page = whiteboard.page;
+  const email = page.signedInEmail;
+  const points = ['whiteboard', 'series'].map((name) => buildElement('li', {},
+    translate(`video.whiteboard.saveConfirm.points.${name}`)));
+  let account = null;
+  if (email) {
+    const [beforeEmail, afterEmail] = translate('video.whiteboard.saveConfirm.signedIn', {email: '\u0000'})
+      .split('\u0000');
+    account = buildElement('p', {class: 'account'}, beforeEmail, buildElement('b', {}, email), afterEmail,
+      buildElement('button', {class: 'link', type: 'button', onclick: async () => {
+        if (await signOutOfHeptabase() && nodes.dialog.open) await confirmSaveWhiteboard();  // not once closed
+      }}, translate('video.whiteboard.signOut')));
+  }
+  openConfirmDialog([buildElement('h3', {}, translate('video.whiteboard.saveConfirm.title', {title: page.title})),
+    buildElement('ul', {class: 'points'}, ...points), account],
+  // focused when the dialog opens, rather than the first button, Sign out
+  buildElement('button', {class: 'hb-btn fill', type: 'submit', autofocus: true},
+    translate(email ? 'video.whiteboard.saveConfirm.save' : 'video.whiteboard.saveConfirm.signInAndSave')),
+  saveWhiteboard);
+}
+
+// The reply to showWhiteboard or refreshWhiteboard. A reason this page does not know, from a later embedded page,
+// reads as one that could not reach Heptabase.
+function handleWhiteboardReadReply(message) {
+  if (message.type === 'whiteboardShown') {
+    whiteboard.focusSection = null;
+    whiteboard.view = 'saved';
+    whiteboard.shownWhiteboard = {title: message.title, spaceId: message.spaceId,
+      contentBounds: message.contentBounds};
+    showWhiteboardToolbar();
+    if (!whiteboard.hasImportStarted && whiteboard.page.episodesToAdd.length) importNewEpisodes();
+  } else if (message.type === 'failed') {
+    showUnreadableWhiteboard(message.reason);
+  }
+}
+
+// What the embedded page says: ready, or a reply to a request, which goes to that request's handler. Messages and
+// fields this page does not know are ignored.
+function handleWhiteboardMessage(event) {
+  if (!whiteboard.frame || event.source !== whiteboard.frame.contentWindow || event.origin !== whiteboard.origin) {
+    return;
+  }
+  const message = event.data;
+  if (!message || typeof message.type !== 'string') return;
+  if (message.type === 'ready') {
+    clearTimeout(whiteboard.frameReadyTimerId);
+    whiteboard.isFrameReady = true;
+    showSavedWhiteboard();
+  } else if (['cardsMeasured', 'whiteboardShown', 'failed'].includes(message.type)) {
+    const handleReply = whiteboard.replyHandlerByRequestIdMap.get(message.requestId);
+    if (!handleReply) return;
+    whiteboard.replyHandlerByRequestIdMap.delete(message.requestId);
+    handleReply(message);
+  }
+}
+
+// A button about the whiteboard: a text button as Heptabase's toolbar has, or with a variant, 'outline' or 'fill'.
+function buildWhiteboardButton(textKey, onclick, variant) {
+  return buildElement('button', {class: `hb-btn${variant ? ` ${variant}` : ''}`, type: 'button', onclick},
+    translate(textKey));
+}
+
+// What is going on with the whiteboard, after its name, with what the user can do about it.
+function buildWhiteboardStatus(text, actions, tooltip) {
+  return buildElement('div', {class: 'whiteboard-status', role: 'status', title: tooltip || undefined},
+    buildElement('span', {class: 'text'}, text), ...(actions || []));
+}
+
+// In place of a whiteboard that cannot be shown, as the app's full-area messages: what happened, in the middle, over
+// what the user can do about it, the first action filled.
+function buildWhiteboardMessage(text, actions) {
+  actions.forEach((action, index) => action.classList.add(index ? 'outline' : 'fill'));
+  return [buildElement('p', {class: 'text'}, text),
+    ...(actions.length ? [buildElement('div', {class: 'actions'}, ...actions)] : [])];
+}
+
+// What takes the whiteboard's place: why it cannot be read, or, with nothing to show, which episodes have no cards.
+function buildWhiteboardPlaceMessage() {
+  if (whiteboard.view === 'unreadable') return buildUnreadableMessage();
+  if (whiteboard.view === 'empty' && whiteboard.page.episodesWithoutCards.length) {
+    return buildWhiteboardMessage(translate('video.whiteboard.noCards',
+      {numbers: formatEpisodeNumbers(whiteboard.page.episodesWithoutCards)}), []);
+  }
+  return null;
+}
+
+// Reads the saved whiteboard again now, as coming back to the page does. The icon turns once to show the click.
+function buildRefreshWhiteboardButton() {
+  const button = buildIconButton('refresh', translate('video.whiteboard.refresh'), {
+    onclick: () => { button.classList.add('turning'); refreshSavedWhiteboard(); },
+    onanimationend: () => button.classList.remove('turning')});
+  return button;
+}
+
+// Brings this episode's section back into view, as the whiteboard opened on it. There only when the episode is on
+// the saved whiteboard, which has a section for each episode on it.
+function buildFocusEpisodeButton() {
+  const focusTarget = resolveWhiteboardFocusTarget({episodeId: EPISODE_ID, chapterId: null});
+  if (!focusTarget) return null;
+  return buildIconButton('focus', translate('video.whiteboard.focusEpisode'),
+    {onclick: () => focusWhiteboardOnUserChoice(focusTarget)});
+}
+
+function buildWhiteboardMenuItem(iconName, textKey, onclick, isDanger) {
+  return buildElement('button', {class: `item${isDanger ? ' danger' : ''}`, type: 'button', role: 'menuitem',
+    onclick: (event) => { event.currentTarget.closest('.whiteboard-menu').hidden = true; onclick(); }},
+  buildIcon(iconName), translate(textKey));
+}
+
+// The ⋯ menu at the end of the saved whiteboard's toolbar: the account this computer is signed in with and Sign out,
+// then Unlink.
+function buildWhiteboardMenu() {
+  const email = whiteboard.page.signedInEmail;
+  const menu = buildElement('div', {class: 'whiteboard-menu', role: 'menu', hidden: true},
+    email ? buildElement('div', {class: 'item-group'}, buildElement('div', {class: 'label', title: email}, email),
+      buildWhiteboardMenuItem('signOut', 'video.whiteboard.signOut', signOutOfHeptabase)) : null,
+    buildElement('div', {class: 'item-group'},
+      buildWhiteboardMenuItem('unlink', 'video.whiteboard.unlink', confirmUnlinkWhiteboard, true)));
+  const button = buildElement('button', {class: 'hb-icon-btn', type: 'button', 'aria-haspopup': 'menu',
+    'aria-label': translate('video.whiteboard.more'), title: translate('video.whiteboard.more'),
+    onclick: (event) => { event.stopPropagation(); menu.hidden = !menu.hidden; }}, buildIcon('more'));
+  return buildElement('div', {class: 'whiteboard-menu-anchor'}, button, menu);
+}
+
+function buildUnreadableMessage() {
+  const reason = whiteboard.unreadableReason;
+  const episodes = whiteboard.page.episodesToAdd;
+  // with the delivered episodes still to add, which wait for the whiteboard to be read again
+  const translateWithEpisodes = (textKey) => (episodes.length
+    ? translate(`${textKey}WithEpisodes`, {numbers: formatEpisodeNumbers(episodes)}) : translate(textKey));
+  const unlink = buildWhiteboardButton('video.whiteboard.unlink', confirmUnlinkWhiteboard);
+  const signInAgain = buildWhiteboardButton('video.whiteboard.signInAgain', signInToHeptabase);
+  if (reason === 'notMeasured') {  // the preview: a card Heptabase could not draw
+    return buildWhiteboardMessage(translate('video.whiteboard.unreadable.notMeasured'),
+      [buildWhiteboardButton('video.whiteboard.retry', async () => {
+        await refetchWhiteboardPage();
+        await showWhiteboardPreview();
+      })]);
+  }
+  if (!whiteboard.page.savedWhiteboard) {  // the embedded page did not answer before the save
+    return buildWhiteboardMessage(translate('video.whiteboard.unreadable.network'),
+      [buildWhiteboardButton('video.whiteboard.retry', reloadWhiteboardFrame)]);
+  }
+  if (reason === 'trashed') {
+    return buildWhiteboardMessage(translate('video.whiteboard.unreadable.trashed'), [
+      buildElement('a', {class: 'hb-btn', href: whiteboard.page.appUrl, target: '_blank', rel: 'noopener'},
+        translate('video.whiteboard.restore'), buildIcon('out')), unlink]);
+  }
+  if (reason === 'deleted') return buildWhiteboardMessage(translate('video.whiteboard.unreadable.deleted'), [unlink]);
+  if (reason === 'forbidden') {
+    return buildWhiteboardMessage(translate('video.whiteboard.unreadable.forbidden'), [signInAgain, unlink]);
+  }
+  if (reason === 'signedOut') {
+    return buildWhiteboardMessage(translateWithEpisodes('video.whiteboard.unreadable.signedOut'),
+      [buildWhiteboardButton('video.whiteboard.signIn', signInToHeptabase), unlink]);
+  }
+  if (reason === 'unauthorized') {
+    return buildWhiteboardMessage(translateWithEpisodes('video.whiteboard.unreadable.unauthorized'),
+      [signInAgain, unlink]);
+  }
+  return buildWhiteboardMessage(translate('video.whiteboard.unreadable.network'),
+    [buildWhiteboardButton('video.whiteboard.retry', () => {
+      if (whiteboard.isFrameReady) showSavedWhiteboard(); else reloadWhiteboardFrame();
+    })]);
+}
+
+// The whiteboard's toolbar, drawn as Heptabase draws the one above a whiteboard. On the left, the map icon and the
+// whiteboard's name, as the app's breadcrumb shows them (the icon only shows, it opens nothing), and, only when there
+// is something to say, what is going on: a whiteboard that cannot be read, a save or an import under way or failed,
+// delivered episodes without cards. On the right, what the user does with the whiteboard. What saving means is the
+// save dialog's to explain, and loading is the embedded page's to show.
+function showWhiteboardToolbar() {
+  showChapterWhiteboardButtons();
+  if (!nodes.whiteboardToolbar) return;
+  const page = whiteboard.page;
+  const statuses = [];
+  const actions = [];
+  if (whiteboard.view === 'saved') {
+    const spaceId = whiteboard.shownWhiteboard.spaceId;
+    const whiteboardUrl = `${page.appUrl}/${spaceId}/whiteboard/${page.savedWhiteboard.whiteboardId}`;
+    actions.push(
+      buildElement('a', {class: 'hb-btn outline', href: whiteboardUrl, target: '_blank', rel: 'noopener'},
+        translate('video.whiteboard.open'), buildIcon('out')),
+      buildFocusEpisodeButton(),
+      buildRefreshWhiteboardButton(),
+      buildWhiteboardMenu());
+    const episodes = page.episodesToAdd;
+    if (whiteboard.isImporting) {
+      statuses.push(buildWhiteboardStatus(translate('video.whiteboard.importing',
+        {numbers: formatEpisodeNumbers(episodes)})));
+    } else if (whiteboard.importFailure) {
+      // another account: sign in with the one that saved it; no subscription: nothing to retry
+      const code = whiteboard.importFailure.code;
+      const importActions = code === 'other_account'
+        ? [buildWhiteboardButton('video.whiteboard.signInAgain', signInToHeptabase)]
+        : code === 'subscription_required' ? []
+          : [buildWhiteboardButton('video.whiteboard.retry', importNewEpisodes)];
+      statuses.push(buildWhiteboardStatus(translate('video.whiteboard.importFailed', {
+        numbers: formatEpisodeNumbers(episodes), reason: whiteboard.importFailure.reason}), importActions,
+      whiteboard.importFailure.details));
+    }
+  } else if (whiteboard.view === 'preview' || (whiteboard.view === 'loading' && !page.savedWhiteboard)) {
+    const save = buildWhiteboardButton(whiteboard.isSaving ? 'video.whiteboard.saving' : 'video.whiteboard.save',
+      confirmSaveWhiteboard, 'fill');
+    save.disabled = !whiteboard.previewLayout || whiteboard.isSaving;
+    actions.push(save);
+    const noticeKey = whiteboard.saveFailure ? null : {canceled: 'video.whiteboard.signInCanceled',
+      failed: 'video.whiteboard.signInFailed'}[whiteboard.signInStatus];
+    if (whiteboard.saveFailure) {
+      // no subscription: the save button stays, for after the user subscribes
+      const text = whiteboard.saveFailure.code === 'subscription_required'
+        ? translate('video.whiteboard.saveNeedsSubscription')
+        : translate('video.whiteboard.saveFailed', {reason: whiteboard.saveFailure.reason});
+      statuses.push(buildWhiteboardStatus(text, null, whiteboard.saveFailure.details));
+    } else if (noticeKey) {
+      statuses.push(buildWhiteboardStatus(translate(noticeKey)));
+    }
+  }
+  if (page.episodesWithoutCards.length && whiteboard.view !== 'empty') {  // empty: the message in the middle says it
+    statuses.push(buildWhiteboardStatus(translate('video.whiteboard.noCards',
+      {numbers: formatEpisodeNumbers(page.episodesWithoutCards)})));
+  }
+  // the saved whiteboard's name in Heptabase once it has shown, the series' name until then
+  const title = page.savedWhiteboard && whiteboard.shownWhiteboard ? whiteboard.shownWhiteboard.title : page.title;
+  const isMenuOpen = Boolean(nodes.whiteboardToolbar.querySelector('.whiteboard-menu:not([hidden])'));
+  nodes.whiteboardToolbar.replaceChildren(
+    buildElement('div', {class: 'start'},
+      buildElement('div', {class: 'breadcrumb'}, buildElement('span', {class: 'map'}, buildIcon('whiteboard')),
+        buildElement('span', {class: 'slash'}, buildIcon('slash')),
+        buildElement('span', {class: 'title', title}, title)),
+      ...statuses),
+    buildElement('div', {class: 'end'}, ...actions));
+  const menu = nodes.whiteboardToolbar.querySelector('.whiteboard-menu');
+  if (menu && isMenuOpen) menu.hidden = false;  // an update while the menu is open keeps it open
+  // the iframe only when it shows something: not while a whiteboard cannot be read, nor with nothing to show, where
+  // the message takes its place
+  whiteboard.frame.hidden = whiteboard.view === 'unreadable' || whiteboard.view === 'empty';
+  const message = buildWhiteboardPlaceMessage();
+  nodes.whiteboardMessage.replaceChildren(...(message || []));
+  nodes.whiteboardMessage.hidden = !message;
+}
+
+function reloadWhiteboardFrame() {
+  whiteboard.isFrameReady = false;
+  whiteboard.hasAskedToShow = false;
+  whiteboard.view = 'loading';
+  showWhiteboardToolbar();
+  whiteboard.frame.src = whiteboard.page.embeddedWhiteboardUrl;
+  watchWhiteboardFrameReady();
+}
+
+// An embedded page that never says it is ready (Heptabase could not be reached) shows as a whiteboard that could not
+// be read, with Retry.
+function watchWhiteboardFrameReady() {
+  clearTimeout(whiteboard.frameReadyTimerId);
+  whiteboard.frameReadyTimerId = setTimeout(() => {
+    if (!whiteboard.isFrameReady) showUnreadableWhiteboard('network');
+  }, FRAME_READY_TIMEOUT_MILLISECONDS);
+}
+
+// The iframe is made once: when the whiteboard view opens, or in the background when the page opens and there are
+// episodes to add to a saved whiteboard (or the page came back from a sign-in).
+function mountWhiteboard() {
+  if (whiteboard.frame || !whiteboard.page) return;
+  whiteboard.origin = new URL(whiteboard.page.embeddedWhiteboardUrl).origin;
+  whiteboard.frame = buildElement('iframe', {class: 'whiteboard-frame', src: whiteboard.page.embeddedWhiteboardUrl,
+    title: translate('video.whiteboardMode'), referrerpolicy: 'no-referrer'});
+  nodes.whiteboardToolbar = buildElement('div', {class: 'whiteboard-toolbar'});
+  nodes.whiteboardMessage = buildElement('div', {class: 'whiteboard-message', role: 'status', hidden: true});
+  nodes.whiteboard.replaceChildren(nodes.whiteboardToolbar, whiteboard.frame, nodes.whiteboardMessage);
+  // a click anywhere else closes the toolbar's ⋯ menu
+  document.addEventListener('click', (event) => {
+    const menu = nodes.whiteboardToolbar.querySelector('.whiteboard-menu');
+    if (menu && !menu.contains(event.target)) menu.hidden = true;
+  });
+  whiteboard.view = 'loading';
+  showWhiteboardToolbar();
+  watchWhiteboardFrameReady();
+}
+
+// Back from Heptabase's sign-in: how it ended, and the save goes on when a save was what needed it (only on this
+// page: the sign-in names the page that started it).
+async function loadWhiteboard() {
+  const pageUrl = new URL(window.location.href);
+  const signInId = pageUrl.searchParams.get(SIGN_IN_QUERY_NAME);
+  if (signInId) {
+    pageUrl.searchParams.delete(SIGN_IN_QUERY_NAME);
+    history.replaceState(history.state, '', pageUrl.pathname + pageUrl.search + pageUrl.hash);
+  }
+  whiteboard.page = await fetchWhiteboardPage(signInId);
+  if (!whiteboard.page) return;
+  if (signInId) {
+    const status = whiteboard.page.signInStatus || 'failed';
+    whiteboard.signInStatus = status === 'signedIn' ? null : status;
+    whiteboard.isSaveRequested = status === 'signedIn' && !whiteboard.page.savedWhiteboard;
+    openWhiteboardMode();
+  }
+  applyModes();
+  showChapterWhiteboardButtons();
+  if (whiteboard.page.savedWhiteboard && whiteboard.page.episodesToAdd.length) mountWhiteboard();
+}
+
+// The saved whiteboard may have changed in Heptabase while the user was away: read it again when the page comes back
+// to the foreground, that is, when its tab is shown and its window has the focus again. While the whiteboard's iframe
+// has the focus, the page gets no focus event when the user comes back from another app, so a timer looks as well.
+const FOREGROUND_CHECK_INTERVAL_MILLISECONDS = 1000;
+let wasPageInForeground = document.visibilityState === 'visible' && document.hasFocus();
+
+function refreshWhiteboardOnReturn() {
+  const isPageInForeground = document.visibilityState === 'visible' && document.hasFocus();
+  if (isPageInForeground && !wasPageInForeground) refreshSavedWhiteboard();
+  wasPageInForeground = isPageInForeground;
+}
+
+window.addEventListener('message', handleWhiteboardMessage);
+window.addEventListener('focus', refreshWhiteboardOnReturn);
+document.addEventListener('visibilitychange', refreshWhiteboardOnReturn);
+setInterval(refreshWhiteboardOnReturn, FOREGROUND_CHECK_INTERVAL_MILLISECONDS);
 
 function togglePlay() {
   if (!video) return;
@@ -519,6 +1551,7 @@ function showHead() {
 
 function showPage() {
   showHead();
+  showOutline();
   showNotices();
   showComments();
   showSurvey();
@@ -540,24 +1573,33 @@ function mountPage() {
   nodes.share = buildElement('div', {});
   nodes.cost = buildElement('div', {class: 'cost'});
   nodes.dialog = buildElement('dialog', {'aria-label': translate('video.share.title')});
-  const mediaUrl = `${BOOT.baseUrl}/media/${EPISODE_ID}`;
   if (pageData.delivery.hasFile) {
     video = buildElement('video', {id: 'video', class: 'hb-video', controls: true, preload: 'metadata',
-      playsinline: true, poster: pageData.delivery.hasCover ? `${mediaUrl}/cover.png` : undefined,
-      src: `${mediaUrl}/video.mp4`});
+      playsinline: true, poster: pageData.delivery.hasCover ? getMediaUrl('cover.png') : undefined,
+      src: getMediaUrl('video.mp4')});
     video.append(...pageData.delivery.subtitles.map((subtitles) => buildElement('track', {kind: 'subtitles',
-      src: `${mediaUrl}/subtitles.${encodeURIComponent(subtitles.languageCode)}.vtt`, srclang: subtitles.languageCode,
+      src: getMediaUrl(`subtitles.${encodeURIComponent(subtitles.languageCode)}.vtt`), srclang: subtitles.languageCode,
       label: translate('video.subtitles')})));
     video.addEventListener('loadedmetadata', applySubtitles);
   }
+  // A toggle in the toolbar, with its key; applySubtitles and applyModes say whether it is on, and whether it is there.
+  const buildToggleButton = (textKey, key, onclick) => buildElement('button', {class: 'hb-btn outline', type: 'button',
+    onclick}, translate(textKey), buildElement('kbd', {}, key));
   nodes.subtitles = video && pageData.delivery.subtitles.length
-    ? buildElement('button', {class: 'hb-btn outline', type: 'button', 'aria-pressed': String(isShowingSubtitles),
-      onclick: toggleSubtitles}, translate('video.subtitles'), buildElement('kbd', {}, 'C'))
-    : null;
-  nodes.theaterMode = video
-    ? buildElement('button', {class: 'hb-btn outline', type: 'button', 'aria-pressed': String(isTheaterModeOn),
-      onclick: toggleTheaterMode}, translate('video.theaterMode'), buildElement('kbd', {}, 'T'))
-    : null;
+    ? buildToggleButton('video.subtitles', 'C', toggleSubtitles) : null;
+  nodes.addComment = buildElement('button', {class: 'hb-btn fill', type: 'button', onclick: startComment},
+    buildIcon('plus'), translate('video.addComment'), buildElement('kbd', {}, 'M'));
+  // the outline shows once notes.yaml fits the delivered video, which the agent may write while the page is open; the
+  // whiteboard once the page server said what it holds
+  nodes.theaterMode = video ? buildToggleButton('video.theaterMode', 'T', toggleTheaterMode) : null;
+  nodes.outlineMode = video ? buildToggleButton('video.outlineMode', 'O', toggleOutlineMode) : null;
+  nodes.whiteboardMode = video ? buildToggleButton('video.whiteboardMode', 'W', toggleWhiteboardMode) : null;
+  nodes.videoHome = buildElement('div', {class: 'video-home'}, video);
+  nodes.outlineScroller = buildElement('div', {class: 'scroller'});
+  nodes.outline = buildElement('section', {class: 'outline-panel', 'aria-label': translate('video.outlineMode')},
+    nodes.outlineScroller);
+  nodes.whiteboard = buildElement('section', {class: 'whiteboard', 'aria-label': translate('video.whiteboardMode')});
+  if (video) video.addEventListener('timeupdate', showOutlineProgress);
   const keyHints = video && buildElement('div', {class: 'keys hb-meta'},
     buildElement('span', {}, buildElement('kbd', {}, translate('video.keys.space')), translate('video.keys.play')),
     buildElement('span', {}, buildElement('kbd', {}, '←'), buildElement('kbd', {}, '→'),
@@ -569,12 +1611,13 @@ function mountPage() {
       nodes.switcher),
     buildElement('div', {class: 'hb-head'}, nodes.eyebrow, nodes.title, nodes.meta),
     nodes.notices,
-    video,
+    video && nodes.videoHome,
     buildElement('div', {class: 'toolbar'},
-      buildElement('button', {class: 'hb-btn fill', type: 'button', onclick: startComment}, buildIcon('plus'),
-        translate('video.addComment'), buildElement('kbd', {}, 'M')),
-      nodes.subtitles, nodes.theaterMode, keyHints),
+      nodes.addComment,
+      nodes.subtitles, nodes.theaterMode, nodes.outlineMode, nodes.whiteboardMode, keyHints),
     nodes.composer,
+    nodes.outline,
+    nodes.whiteboard,
     buildElement('section', {class: 'hb-section'},
       buildElement('h2', {}, translate('video.comments.heading'), nodes.commentCount),
       buildElement('p', {class: 'hb-lead'}, translate('video.comments.lead')), nodes.comments),
@@ -591,8 +1634,9 @@ function mountPage() {
     nodes.dialog].filter(Boolean));  // no video element when the file is missing, no dev mode sections without it
   showPage();
   applySubtitles();
-  applyTheaterMode();
+  applyModes();
   if (pageData.isDevModeOn) fetchCostReport();
+  loadWhiteboard();
 }
 
 async function refreshPage() {
@@ -612,18 +1656,23 @@ async function refreshPage() {
         onclick: () => window.location.reload()}, translate('video.redelivered.reload'))));
   }
   showPage();
+  refreshWhiteboardCards();
 }
 
 window.addEventListener('keydown', (event) => {
   if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !pageData) return;
   if (checkIsTyping(event.target) || (nodes.dialog && nodes.dialog.open)) return;
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  // the whiteboard shows no video: playing and commenting wait until it closes
+  if (checkIsWhiteboardModeShown() && [' ', 'ArrowLeft', 'ArrowRight', 'm', 'c'].includes(key)) return;
   if (key === ' ') togglePlay();
   else if (key === 'ArrowLeft') seekBy(-SEEK_SECONDS);
   else if (key === 'ArrowRight') seekBy(SEEK_SECONDS);
   else if (key === 'm') startComment();
   else if (key === 'c') toggleSubtitles();
   else if (key === 't') toggleTheaterMode();
+  else if (key === 'o') toggleOutlineMode();
+  else if (key === 'w') toggleWhiteboardMode();
   else return;
   event.preventDefault();
   event.stopPropagation();

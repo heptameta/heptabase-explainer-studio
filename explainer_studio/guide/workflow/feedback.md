@@ -27,7 +27,8 @@ The default is to respond, not to change the video.
 ## Changing the video
 
 Edit the script or scenes, then run what the change needs: script audience review for changed scenes, `narrate`,
-`render`, a look at its screenshots, `deliver`, `video open`. Comments stay with the episode; the page marks those
+`render`, a look at its screenshots, the cards of the scenes that changed (`references/cards.md`; `notes check` says
+what no longer fits), `deliver`, `video open`. Comments stay with the episode; the page marks those
 made before the latest delivery as on an older video.
 
 When the viewer got lost earlier than the plan expected, make the remaining episodes lighter (smaller steps, fewer

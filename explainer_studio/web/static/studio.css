@@ -16,6 +16,8 @@
 --option-white:hsla(0,0%,68%,.5);--option-yellow:hsla(45,79%,57%,.5);--option-green:hsla(140,68%,52%,.5);
 --option-blue:hsla(205,87%,64%,.5);--option-orange:hsla(33,79%,57%,.5);
 --bg-yellow-sect:hsla(46,74%,88%,.4);--bg-green-sect:hsla(103,23%,86%,.4);--bg-red-sect:hsla(0,74%,92%,.5);
+--whiteboard-background:#eeeded;--menu-texture-bg-medium:rgba(246,246,246,.8);--transparent-text:rgba(0,0,0,.12);--tooltip-bg:rgba(0,0,0,.9);
+--shadow-main:0 7px 22px 0 rgba(0,0,0,.25),0 0 1.5px 0 rgba(0,0,0,.3),0 0 1px 0 rgba(0,0,0,.4);
 --shadow-float:0 0 6px 0 rgba(0,0,0,.08);--shadow-card:rgb(15 15 15/10%) 0 0 0 1px,rgb(15 15 15/10%) 0 2px 4px;
 --shadow-dialog:rgb(15 15 15/5%) 0 0 0 1px,rgb(15 15 15/10%) 0 3px 6px,rgb(15 15 15/20%) 0 9px 24px}
 :root[data-theme="dark"]{color-scheme:dark}
@@ -28,6 +30,8 @@
 --option-white:hsla(0,0%,58%,.5);--option-yellow:hsla(46,100%,41%,.5);--option-green:hsla(147,100%,34%,.5);
 --option-blue:hsla(205,100%,40%,.5);--option-orange:hsla(35,100%,42%,.5);
 --bg-yellow-sect:hsla(55,30%,17%,.5);--bg-green-sect:hsla(144,12%,17%,.5);--bg-red-sect:hsla(0,40%,20%,.5);
+--whiteboard-background:#191919;--menu-texture-bg-medium:rgba(61,64,67,.9);--transparent-text:rgba(255,255,255,.16);--tooltip-bg:rgba(200,201,202,.9);
+--shadow-main:0 0 0 1px rgba(15,15,15,.1),0 3px 6px rgba(15,15,15,.2),0 9px 24px rgba(15,15,15,.4);
 --shadow-float:0 0 0 1px rgba(0,0,0,.2);--shadow-card:rgb(15 15 15/20%) 0 0 0 1px,rgb(15 15 15/20%) 0 2px 4px;
 --shadow-dialog:rgb(15 15 15/20%) 0 0 0 1px,rgb(15 15 15/40%) 0 3px 6px,rgb(15 15 15/40%) 0 9px 24px}}
 
@@ -50,7 +54,9 @@ border-radius:4px;box-shadow:inset 0 0 0 1px var(--light-middle-grey);font:inher
 [hidden]{display:none!important}
 
 /* the frame: header and pane */
-.hb-pane{position:relative;min-height:100vh;background:var(--background-secondary);display:flex;flex-direction:column}
+/* a container, so that what reaches the window's edges can size itself without the scrollbar (100cqw) */
+.hb-pane{position:relative;min-height:100vh;background:var(--background-secondary);display:flex;flex-direction:column;
+container-type:inline-size}
 .hb-bar{position:sticky;top:0;z-index:5;box-sizing:border-box;display:flex;align-items:center;column-gap:8px;min-height:48px;padding:0 8px;
 background:var(--background-secondary);box-shadow:inset 0 -1px 0 var(--light-grey)}
 .hb-brand{display:flex;align-items:center;column-gap:8px;border-radius:6px;padding:4px 6px;text-decoration:none}.hb-brand:hover{background:var(--light-grey)}
@@ -193,6 +199,125 @@ max-width:none;margin-left:calc((100% - var(--theater-width)) / 2);scroll-margin
 box-shadow:0 0 0 100vmax #000;clip-path:inset(0 -100vmax)}
 .hb-video::cue{font-family:Inter,"PingFang TC","Noto Sans TC",sans-serif;font-size:20px;line-height:1.4;background:rgba(0,0,0,.72)}
 .toolbar{display:flex;flex-wrap:wrap;align-items:center;column-gap:8px;row-gap:8px}
+/* the whiteboard, out of the whiteboard view: drawn off screen, so that its iframe can measure and add new episodes
+   in the background */
+.whiteboard{position:fixed;left:-20000px;top:0;width:1200px;height:800px;visibility:hidden;pointer-events:none}
+/* the outline (notes.yaml): this episode's chapters, each a heading that stays in sight over its scenes, each scene a
+   key frame, a title, where it starts and its core idea; the scene the video is in is marked, with how far into it */
+.outline-panel{position:relative;display:none;min-width:0;border-radius:8px;background:var(--background-secondary)}
+/* the outline's edge, over the headings that stick to its top */
+.outline-panel::after{content:'';position:absolute;inset:0;z-index:2;border-radius:8px;
+box-shadow:inset 0 0 0 1px var(--light-grey);pointer-events:none}
+.outline-mode .outline-panel{display:block}
+/* beside the video: the page as wide as the window allows up to 1160px, the outline on the right as tall as the video
+   and scrolling on its own, and the rest of the page in the column under the video. The whiteboard view keeps the page
+   as wide as the view under it, so the way back to the plan and the episode switcher stay where they were. */
+.outline-mode .hb-col:has(>.video-home>.outline-panel),
+.outline-under-whiteboard .hb-col:has(>.video-home>.outline-panel){max-width:1160px}
+.outline-mode .hb-col:has(>.video-home>.outline-panel)>:not(.topnav,.video-home,dialog){max-width:calc(100% - 376px)}
+.outline-mode .video-home:has(>.outline-panel){display:grid;grid-template-columns:minmax(0,1fr) 360px;column-gap:16px}
+.video-home>.outline-panel{overflow:hidden}
+.video-home>.outline-panel .scroller{position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain}
+.outline-panel .chapter+.chapter{box-shadow:inset 0 1px 0 var(--light-grey)}
+.outline-panel .chapter-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;column-gap:8px;
+min-height:40px;box-sizing:border-box;padding:8px 8px 4px 12px;border-radius:8px 8px 0 0;background:var(--background-secondary)}
+/* under the toolbar, the headings stay under the page's header */
+.hb-col>.outline-panel .chapter-head{top:48px}
+.outline-panel h3{flex:1;min-width:0;margin:0;font-size:14px;line-height:20px;font-weight:600;color:var(--text-color)}
+.outline-panel h3 .number{margin-right:6px;font-weight:500;color:var(--middle-grey-hover)}
+.outline-panel .chapter-head .hb-meta{flex:none}
+.outline-panel .chapter-head .hb-icon-btn{width:28px;height:28px;margin:-4px 0}
+.outline-panel .scenes{display:flex;flex-direction:column;row-gap:2px;padding:0 4px 8px}
+.scene{position:relative;display:grid;grid-template-columns:96px minmax(0,1fr);column-gap:10px;padding:6px 8px;border-radius:6px;
+cursor:pointer}
+@media (hover:hover){.scene:hover{background:var(--ultra-light-grey)}}
+.scene.current{background:var(--middle-transparent-blue)}
+.scene .thumb{position:relative;align-self:start}
+.scene .thumb img{display:block;width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:4px;background:#000;
+box-shadow:0 0 0 1px var(--light-grey)}
+.scene .bar{position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:0 0 4px 4px;overflow:hidden}
+.scene .bar i{display:block;height:100%;width:0;background:var(--active-item)}
+.scene .body{display:flex;flex-direction:column;row-gap:2px;min-width:0}
+.scene .title{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:6px}
+.scene .title b{font-size:13px;line-height:18px;font-weight:600;color:var(--text-color)}
+.scene .body p{margin:0;font-size:12px;line-height:18px;color:var(--middle-hard-grey)}
+/* beside the video, two lines of each core idea */
+.video-home>.outline-panel .scene .body p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+overflow:hidden}
+
+/* whiteboard view: the page is only the header, the way back to the plan with the episode switcher, the toolbar and
+   the series' whiteboard (Heptabase's embedded whiteboard page, under a toolbar drawn as the app draws the one above a
+   whiteboard, the two one block), filling the window under them, and the page itself does not scroll; with no video in
+   view, the rest (the title, the video, the key hints, the composer, the comments and the sections under them) is
+   hidden. The page keeps its scrollbar's space, so the header does not move when the view opens. */
+html:has(>body.whiteboard-mode){overscroll-behavior:none}
+.whiteboard-mode .hb-pane{height:100vh;height:100dvh;min-height:0}
+.whiteboard-mode .hb-pane>main{min-height:0;padding-bottom:16px}
+.whiteboard-mode .hb-col>:not(.topnav,.toolbar,.whiteboard,dialog),.whiteboard-mode .toolbar .keys{display:none}
+.whiteboard-mode .whiteboard{position:static;visibility:visible;pointer-events:auto;height:auto;
+--whiteboard-width:calc(100cqw - 48px);width:var(--whiteboard-width);margin-left:calc((100% - var(--whiteboard-width)) / 2);
+flex:1;min-height:0;display:flex;flex-direction:column;border-radius:8px;overflow:hidden;
+background:var(--whiteboard-background)}
+/* the toolbar the app shows above a whiteboard: 48px, the whiteboard's background, the map icon and a slash before the name in
+   14/20 medium, 28px text buttons, 32x28 icon buttons with 18px icons, 8px apart */
+.whiteboard-toolbar{position:relative;z-index:1;flex:none;box-sizing:border-box;display:flex;align-items:center;
+column-gap:16px;min-height:48px;padding:0 8px 0 0;background:var(--whiteboard-background)}
+.whiteboard-toolbar .start{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;column-gap:8px;row-gap:2px;
+padding:4px 0 4px 8px}
+.whiteboard-toolbar .breadcrumb{display:flex;align-items:center;min-width:0;max-width:100%}
+.whiteboard-toolbar .map{flex:none;display:flex;align-items:center;justify-content:center;width:32px;height:28px}
+.sprites{position:absolute;width:0;height:0;overflow:hidden}
+.whiteboard-toolbar .map svg{width:18px;height:18px;fill:url(#map-light)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .whiteboard-toolbar .map svg{fill:url(#map-dark)}}
+.whiteboard-toolbar .slash{flex:none;display:flex;padding:0 4px}
+.whiteboard-toolbar .slash svg{width:4px;height:14px;fill:var(--transparent-text)}
+.whiteboard-toolbar .title{min-width:0;max-width:100%;padding:3px 6px;border-radius:4px;font-weight:500;
+color:var(--text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.whiteboard-toolbar .end{flex:none;display:flex;align-items:center;column-gap:8px}
+.whiteboard-toolbar .hb-icon-btn{width:32px;height:28px;border-radius:6px}
+.whiteboard-toolbar .hb-icon-btn svg{width:18px;height:18px}
+/* the app's tooltip: 12/18 medium on a dark chip, 8px from the button, after half a second; under the button, where
+   the app puts it for a toolbar at the top of the window, and on its left in the outline, which clips what leaves it */
+[data-tooltip]{position:relative}
+[data-tooltip]::after{content:attr(data-tooltip);position:absolute;top:calc(100% + 8px);left:50%;
+z-index:10;box-sizing:border-box;width:max-content;max-width:200px;padding:3px 6px;border-radius:6px;transform:translateX(-50%);
+background:var(--tooltip-bg);color:var(--background-secondary);font-size:12px;line-height:18px;font-weight:500;
+pointer-events:none;visibility:hidden}
+[data-tooltip]:hover::after{visibility:visible;transition:visibility 0s .5s}
+.outline-panel [data-tooltip]::after{top:50%;left:auto;right:calc(100% + 8px);transform:translateY(-50%)}
+.whiteboard-status{display:flex;flex-wrap:wrap;align-items:center;column-gap:4px;min-width:0;color:var(--middle-grey-hover)}
+.whiteboard-status .text{min-width:0;padding:4px 0}
+.whiteboard-menu-anchor{position:relative}
+/* the refresh button's icon turns once when pressed */
+.hb-icon-btn.turning svg{animation:turn-once .5s ease-out}
+@keyframes turn-once{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.hb-icon-btn.turning svg{animation:none}}
+/* the app's menu: 248px wide, its translucent surface, groups of 32px items
+with a 16px icon, divided by a line */
+.whiteboard-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:5;box-sizing:border-box;width:248px;
+border-radius:4px;background:var(--menu-texture-bg-medium);-webkit-backdrop-filter:blur(40px);backdrop-filter:blur(40px);
+box-shadow:var(--shadow-main)}
+.whiteboard-menu .item-group{display:flex;flex-direction:column;padding:4px 0}
+.whiteboard-menu .item-group+.item-group{border-top:1px solid var(--light-grey)}
+.whiteboard-menu .label{margin:0 4px;padding:5px 8px;font-size:12px;line-height:18px;font-weight:500;color:var(--middle-grey);
+white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.whiteboard-menu .item{display:flex;align-items:center;min-height:32px;margin:0 4px;padding:0 8px;border-radius:4px;
+text-align:left;color:var(--text-color)}
+.whiteboard-menu .item:hover{background:var(--light-grey)}
+.whiteboard-menu .item svg{flex-shrink:0;width:16px;height:16px;margin-right:8px;fill:var(--middle-hard-grey)}
+.whiteboard-menu .item.danger{color:var(--danger-item)}
+.whiteboard-menu .item.danger svg{fill:var(--danger-item)}
+/* the frame's own colour scheme is light, as an empty document's is: a frame whose scheme differs from its document's
+   gets an opaque white backdrop until the web app sets its own, a white flash in dark mode */
+.whiteboard-frame{display:block;flex:1;min-height:0;width:100%;height:100%;border:0;background:var(--whiteboard-background);
+color-scheme:normal}
+/* in place of a whiteboard that cannot be shown: the app's full-area message, a 17px semibold
+   line in the middle over its buttons, 24px apart, 12px between the buttons */
+.whiteboard-message{flex:1;min-height:0;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;
+justify-content:center;row-gap:24px;padding:24px;text-align:center}
+.whiteboard-message .text{max-width:400px;margin:0;font-size:17px;line-height:1.5;font-weight:600;color:var(--text-color)}
+.whiteboard-message .actions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
+
 .toolbar .keys{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:4px}
 .toolbar .keys span{display:inline-flex;align-items:center;column-gap:4px}
 .composer{display:flex;flex-direction:column;row-gap:8px;border-radius:8px;padding:10px 12px;background:var(--ultra-light-grey);
@@ -268,6 +393,13 @@ dialog .list li{display:flex;align-items:flex-start;column-gap:8px;padding:4px 1
 dialog .list li .text{flex:1;min-width:0;overflow-wrap:anywhere}
 dialog .note{font-size:12px;line-height:18px;color:var(--middle-grey-hover)}
 dialog .note b{font-weight:500;color:var(--middle-hard-grey)}
+dialog .points{margin:0;padding-left:20px;display:flex;flex-direction:column;row-gap:4px}
+dialog .account{color:var(--middle-hard-grey)}
+dialog .account b{font-weight:500;color:var(--text-color)}
+/* Sign out after the account, as the app's consent page puts Switch accounts: medium, the active colour, underlined */
+dialog .account .link{margin-left:4px;padding:0;border:0;background:none;font:inherit;font-weight:500;
+color:var(--active-item);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+dialog .account .link:focus:not(:focus-visible){outline:none}
 dialog .buttons{display:flex;justify-content:flex-end;column-gap:8px;padding-top:4px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:20;max-width:calc(100vw - 48px);padding:8px 14px;border-radius:8px;
 background:var(--text-color);color:var(--background-secondary);box-shadow:var(--shadow-dialog);font-weight:500}

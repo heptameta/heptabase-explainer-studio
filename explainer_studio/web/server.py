@@ -11,6 +11,7 @@ request (the pages' page digest polling does not count) and is started by `web.l
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import math
 import os
@@ -23,15 +24,19 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 
-from .. import __version__
+from filelock import Timeout as LockTimeout
+
+from .. import __version__, heptabase_sign_in, heptabase_whiteboard
+from ..chapters import find_card_image_file_path, find_frame_file_path
 from ..errors import StudioError
 from ..feedback import add_comment, delete_comment, edit_comment, load_feedback, set_survey_answer
 from ..feedback_bundle import resolve_unshared_items, share_feedback
 from ..file_io import get_current_time, write_text_atomic
 from ..gaps import load_gaps
 from ..paths import Series
+from ..plan import read_series_title
 from ..schemas.feedback import CommentAnchor, EpisodeAnchor, MomentAnchor
 from . import pages
 from .i18n import translate
@@ -43,13 +48,26 @@ MAX_BODY_BYTES = 1_000_000
 CHUNK_BYTES = 256 * 1024
 CONTENT_TYPE_BY_SUFFIX_MAP = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
                               ".woff2": "font/woff2", ".svg": "image/svg+xml", ".txt": "text/plain; charset=utf-8",
-                              ".png": "image/png", ".mp4": "video/mp4", ".vtt": "text/vtt; charset=utf-8"}
+                              ".png": "image/png", ".mp4": "video/mp4", ".vtt": "text/vtt; charset=utf-8",
+                              ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}
+# The query parameter with which the browser comes back to the video page after Heptabase's sign-in: the sign-in's id.
+SIGN_IN_QUERY_NAME = "heptabaseSignIn"
+# A page path a sign-in may return to: printable ASCII only, so it is safe in a Location header.
+RETURN_PATH_PATTERN = re.compile(r"[!-~]+")
+
+
+def _build_content_security_policy() -> str:
+    # the video page shows the series' whiteboard in the Heptabase web app's embedded whiteboard page
+    app_url_parts = urlsplit(heptabase_sign_in.resolve_heptabase_app_url())
+    return ("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; media-src 'self'; connect-src 'self'; "
+            f"frame-src {app_url_parts.scheme}://{app_url_parts.netloc}; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+
+
 SECURITY_HEADER_VALUE_BY_NAME_MAP = {
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' "
-                               "'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self'; "
-                               "frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    "Content-Security-Policy": _build_content_security_policy(),
 }
 # the delivered subtitles in one language, served as WebVTT from the delivered SRT
 SUBTITLES_MEDIA_NAME_PATTERN = re.compile(r"subtitles\.([A-Za-z0-9-]+)\.vtt")
@@ -88,6 +106,10 @@ class PageServer(ThreadingHTTPServer):
         self.idle_seconds = idle_seconds
         self.last_activity_monotonic_seconds = time.monotonic()
         self.stop_event = threading.Event()
+        # Heptabase sign-ins started from this server's pages, by their OAuth state
+        self.sign_in_attempt_by_state_map: dict[str, heptabase_sign_in.SignInAttempt] = {}
+        # Held while a callback completes a sign-in, so a repeated callback cannot exchange the same code twice
+        self.sign_in_attempt_lock = threading.Lock()
 
     @property
     def port(self) -> int:
@@ -196,6 +218,9 @@ class PageRequestHandler(BaseHTTPRequestHandler):
         try:
             url = urlsplit(self.path)
             path_parts = [unquote(part) for part in url.path.split("/") if part]
+            if self._check_is_local_host() and method == "GET" and url.path == heptabase_sign_in.CALLBACK_PATH:
+                # Heptabase sends the browser back here, without the token; the sign-in's state protects it.
+                return self._finish_heptabase_sign_in(parse_qs(url.query))
             if (not self._check_is_local_host() or not path_parts
                     or not secrets.compare_digest(path_parts[0], self.server.token)):
                 self.close_connection = True
@@ -220,18 +245,77 @@ class PageRequestHandler(BaseHTTPRequestHandler):
             except OSError:
                 pass
 
+    # Heptabase sign-in ----------------------------------------------------------------------------------------------
+    def _finish_heptabase_sign_in(self, query: dict[str, list[str]]) -> None:
+        """Heptabase sends the browser here once the user allowed or canceled the sign-in; the browser then goes back
+        to the page that started it, which asks how the sign-in ended."""
+        attempt = self.server.sign_in_attempt_by_state_map.get((query.get("state") or [""])[0])
+        if attempt is None:
+            return self._send_sign_in_failure_html()
+        # A repeated callback waits here for the first to finish, then sees how the sign-in ended.
+        with self.server.sign_in_attempt_lock:
+            if attempt.status == "pending":
+                attempt.status = self._complete_sign_in_attempt(attempt, query)
+        query_separator = "&" if "?" in attempt.return_path else "?"
+        self._send(303, b"", "text/plain; charset=utf-8", {
+            "Location": f"{attempt.return_path}{query_separator}{SIGN_IN_QUERY_NAME}={quote(attempt.state)}"})
+
+    @staticmethod
+    def _complete_sign_in_attempt(attempt: heptabase_sign_in.SignInAttempt,
+                                  query: dict[str, list[str]]) -> heptabase_sign_in.SignInStatus:
+        if heptabase_sign_in.check_is_sign_in_attempt_expired(attempt):
+            return "failed"
+        code = (query.get("code") or [""])[0]
+        if not code:
+            return "canceled" if (query.get("error") or [""])[0] == "access_denied" else "failed"
+        try:
+            heptabase_sign_in.finish_sign_in(attempt, code)
+        except StudioError as error:
+            print(f"Heptabase sign-in did not finish: {error.what} ({error.why})", file=sys.stderr)
+            return "failed"
+        return "signedIn"
+
+    def _find_sign_in_status(self, sign_in_id: str) -> heptabase_sign_in.SignInStatus | None:
+        attempt = self.server.sign_in_attempt_by_state_map.get(sign_in_id)
+        if attempt is None:
+            return None
+        if attempt.status == "pending" and heptabase_sign_in.check_is_sign_in_attempt_expired(attempt):
+            return "failed"
+        return attempt.status
+
+    def _send_sign_in_failure_html(self) -> None:
+        """For a sign-in this page server does not know (it restarted, or the link is old): try again from Studio."""
+        language_code = pages.read_page_language_code(self.server.series)
+        title = html.escape(translate(language_code, "heptabaseCallback.failed.title"))
+        body = html.escape(translate(language_code, "heptabaseCallback.failed.body"))
+        # No link to the page server's static files: this request has no token, and the answer must not carry it.
+        self._send(400, (f'<!doctype html><html lang="{language_code}"><head><meta charset="utf-8"><title>{title}'
+                         f'</title></head><body><h1>{title}</h1><p>{body}</p></body></html>').encode(),
+                   "text/html; charset=utf-8")
+
+    def _send_heptabase_failure(self, error: StudioError) -> None:
+        """A request to Heptabase that did not go through: 401 when a sign-in is needed, with whether this computer is
+        signed out or Heptabase no longer accepts its sign-in, 409 with the reason when Studio did not send it, else 502
+        with Heptabase's error code when it gave one."""
+        if isinstance(error, heptabase_sign_in.HeptabaseSignInRequiredError):
+            return self._send_json(401, {"code": error.code, "message": error.why})
+        if isinstance(error, heptabase_whiteboard.WhiteboardImportRefusedError):
+            return self._send_json(409, {"code": error.code, "message": error.what, "details": [error.why]})
+        code = error.code if isinstance(error, heptabase_sign_in.HeptabaseRequestError) else None
+        self._send_json(502, {"code": code or "not_sent", "message": error.what, "details": [error.why]})
+
     def _route_request(self, method: str, route: list[str], query: dict[str, list[str]]) -> None:
         series = self.server.series
         base_url = f"/{self.server.token}"
         match method, route:
             case ("GET" | "HEAD"), ([] | ["plan"]):
                 language_code = pages.read_page_language_code(series)
-                title = f"{pages.read_series_title(series)} · {translate(language_code, 'plan.eyebrow')}"
+                title = f"{read_series_title(series)} · {translate(language_code, 'plan.eyebrow')}"
                 self._send_html(pages.format_page_html("plan", language_code, title, base_url, {"pageName": "plan"}))
             case ("GET" | "HEAD"), ["video", episode_id]:
                 series.get_episode_paths(episode_id)
                 language_code = pages.read_page_language_code(series)
-                self._send_html(pages.format_page_html("video", language_code, pages.read_series_title(series),
+                self._send_html(pages.format_page_html("video", language_code, read_series_title(series),
                                                        base_url, {"pageName": "video", "episodeId": episode_id}))
             case "GET", ["health"]:
                 self._send_json(200, {"explainer_studio_version": __version__,
@@ -310,6 +394,69 @@ class PageRequestHandler(BaseHTTPRequestHandler):
                 except StudioError as error:
                     return self._send_json(502, {"code": "not_sent", "message": error.why})
                 self._send_json(200, {"isSent": bool(shared_items)})
+            case ("GET" | "HEAD"), ["media", episode_id, "frames", frame_name] if frame_name.endswith(".jpg"):
+                # a beat's frame in the latest delivered video, for the outline
+                frame_file_path = find_frame_file_path(series, episode_id, frame_name.removesuffix(".jpg"))
+                if frame_file_path is None:
+                    return self._send(404, b"not found", "text/plain")
+                self._send_file(frame_file_path)
+            case "GET", ["api", "series-whiteboard"]:
+                whiteboard_page = heptabase_whiteboard.compute_whiteboard_page(series)
+                sign_in_id = (query.get("signInId") or [""])[0]
+                if sign_in_id:  # the page came back from Heptabase's sign-in: how it ended
+                    whiteboard_page["signInStatus"] = self._find_sign_in_status(sign_in_id)
+                self._send_json(200, whiteboard_page)
+            case "POST", ["api", "series-whiteboard", "sign-in"]:
+                # The page goes to Heptabase's sign-in in the same tab and comes back to `returnPath`, one of its pages.
+                body = self._read_json_body()
+                return_path = body.get("returnPath") if isinstance(body, dict) else None
+                if not isinstance(return_path, str) or not return_path.startswith(f"{base_url}/") \
+                        or not RETURN_PATH_PATTERN.fullmatch(return_path):
+                    raise InvalidEditError("invalid")
+                redirect_uri = f"http://127.0.0.1:{self.server.port}{heptabase_sign_in.CALLBACK_PATH}"
+                try:
+                    attempt, authorization_url = heptabase_sign_in.create_sign_in_attempt(redirect_uri,
+                                                                                             return_path)
+                except StudioError as error:
+                    return self._send_heptabase_failure(error)
+                self.server.sign_in_attempt_by_state_map[attempt.state] = attempt
+                self._send_json(200, {"authorizationUrl": authorization_url})
+            case "POST", ["api", "series-whiteboard", "sign-out"]:
+                # for every series on this computer: the links stay, and a saved whiteboard then needs a sign-in
+                try:
+                    heptabase_sign_in.sign_out(heptabase_sign_in.resolve_heptabase_api_url())
+                except StudioError as error:
+                    return self._send_heptabase_failure(error)
+                self._send_json(200, {})
+            case "GET", ["api", "series-whiteboard", "access-token"]:
+                try:
+                    access_token = heptabase_sign_in.fetch_access_token(
+                        heptabase_sign_in.resolve_heptabase_api_url())
+                except StudioError as error:
+                    return self._send_heptabase_failure(error)
+                self._send_json(200, {"accessToken": access_token.value})
+            case "POST", ["api", "series-whiteboard", "import"]:
+                # the episodes to add, laid out by the page at the positions the embedded whiteboard measured
+                layout = heptabase_whiteboard.parse_whiteboard_layout(self._read_json_body())
+                try:
+                    heptabase_whiteboard.import_episodes(series, layout)
+                except StudioError as error:  # Heptabase refused or was not reached, or Studio did not send it
+                    return self._send_heptabase_failure(error)
+                except LockTimeout:  # another page of the series is saving
+                    return self._send_json(409, {"code": "busy"})
+                self._send_json(200, {})
+            case "POST", ["api", "series-whiteboard", "unlink"]:
+                try:
+                    heptabase_whiteboard.unlink(series)
+                except LockTimeout:
+                    return self._send_json(409, {"code": "busy"})
+                self._send_json(200, {})
+            case ("GET" | "HEAD"), ["media", episode_id, "card-images", *image_path_parts] if image_path_parts:
+                # a picture a card shows: a credited asset or one of the episode's card-images/
+                image_file_path = find_card_image_file_path(series, episode_id, "/".join(image_path_parts))
+                if image_file_path is None:
+                    return self._send(404, b"not found", "text/plain")
+                self._send_file(image_file_path)
             case ("GET" | "HEAD"), ["media", episode_id, media_name]:
                 # video.mp4, cover.png or subtitles.<language code>.vtt of the latest delivery
                 latest_delivery = pages.find_latest_delivery(series, episode_id)

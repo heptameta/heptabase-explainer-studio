@@ -23,7 +23,7 @@ from .errors import StudioError
 from .explainer_studio_versions import clear_versions_since_last_delivery, list_earlier_versions_since_last_delivery
 from .file_io import get_current_time, load_json_model, load_yaml_model, write_json_model
 from .paths import Series
-from .plan import load_plan
+from .plan import list_raw_episode_ids, load_plan, read_raw_plan
 from .schemas.automatic_checks import AutomaticChecks
 from .schemas.delivery_record import DeliveredFiles, DeliveredSubtitles, DeliveryRecord
 from .schemas.script import Script, compute_script_narration_digest
@@ -61,6 +61,24 @@ def load_latest_delivery_record(series: Series, episode_id: str) -> DeliveryReco
     return load_delivery_record(series, record_dir_paths[-1]) if record_dir_paths else None
 
 
+def find_latest_delivery_record(series: Series, episode_id: str) -> DeliveryRecord | None:
+    """The latest delivery's record, or None when there is none or it cannot be read."""
+    try:
+        return load_latest_delivery_record(series, episode_id)
+    except StudioError:
+        return None
+
+
+def list_delivered_episodes(series: Series) -> list[dict[str, str]]:
+    """The delivered episodes in plan order (plan.yaml as written, even when it is not valid), each its id and
+    title."""
+    _, raw_plan, _ = read_raw_plan(series)
+    title_by_episode_id_map = {raw_episode.get("id"): raw_episode.get("title")
+                               for raw_episode in raw_plan.get("episodes") or [] if isinstance(raw_episode, dict)}
+    return [{"id": episode_id, "title": str(title_by_episode_id_map.get(episode_id) or episode_id)}
+            for episode_id in list_raw_episode_ids(raw_plan) if find_latest_delivery_record(series, episode_id)]
+
+
 def find_delivery_record_dir_path_in_effect_at(series: Series, episode_id: str, moment: datetime) -> Path | None:
     """The folder of the delivery record in effect at `moment`: the latest one delivered at or before it. None when
     the episode had not been delivered by then."""
@@ -79,6 +97,11 @@ def load_delivered_timeline(series: Series, record_dir_path: Path) -> Timeline |
         if timeline_file_path.exists() else None
 
 
+def load_latest_delivered_timeline(series: Series, episode_id: str) -> Timeline | None:
+    record_dir_paths = list_delivery_record_dir_paths(series, episode_id)
+    return load_delivered_timeline(series, record_dir_paths[-1]) if record_dir_paths else None
+
+
 def load_delivered_script(series: Series, record_dir_path: Path) -> Script | None:
     script_file_path = record_dir_path / "script.yaml"
     return load_yaml_model(Script, script_file_path,
@@ -87,8 +110,9 @@ def load_delivered_script(series: Series, record_dir_path: Path) -> Script | Non
 
 
 # Delivering ---------------------------------------------------------------------------------------------------------
-def find_delivery_problems(series: Series, episode_id: str, script: Script) -> list[str]:
-    """Why delivery is refused, checked in the order the design gives."""
+def find_delivery_problems(series: Series, episode_id: str, script: Script, should_check_notes: bool) -> list[str]:
+    """Why delivery is refused, checked in the order the design gives. Without `should_check_notes` (the user wants
+    no cards), the cards are not checked."""
     episode_paths = series.get_episode_paths(episode_id)
     render_file_paths = (episode_paths.render_video_file_path, episode_paths.render_subtitles_file_path,
                          episode_paths.render_cover_file_path, episode_paths.render_timeline_file_path)
@@ -109,6 +133,11 @@ def find_delivery_problems(series: Series, episode_id: str, script: Script) -> l
     problems += [f"automatic check {issue.check_name} in scene {issue.scene_id}"
                  + (f", beat {issue.beat_id}" if issue.beat_id else "") + f": {issue.detail}"
                  for issue in automatic_checks.find_blocking_issues()]
+    if should_check_notes:
+        # the cards, so the video page shows the chapters and the whiteboard from the moment of delivery
+        from .chapters import find_episode_notes_problems
+
+        problems += find_episode_notes_problems(series, episode_id, timeline)
     return problems
 
 
@@ -145,12 +174,12 @@ def _remove_previous_delivered_files(series: Series, previous_record: DeliveryRe
             (series.root_dir_path / file_name).unlink(missing_ok=True)
 
 
-def deliver(series: Series, episode_id: str) -> DeliveryResult:
+def deliver(series: Series, episode_id: str, should_check_notes: bool = True) -> DeliveryResult:
     plan = load_plan(series)
     title = plan.find_episode(episode_id).title
     language_code = plan.resolve_episode_language_code(episode_id)
     script = load_script(series, episode_id)
-    problems = find_delivery_problems(series, episode_id, script)
+    problems = find_delivery_problems(series, episode_id, script, should_check_notes)
     if problems:
         raise StudioError(f"{episode_id} cannot be delivered yet", f"{len(problems)} problem(s)",
                           "fix these, then run deliver again", problems)

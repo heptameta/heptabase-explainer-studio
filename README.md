@@ -163,8 +163,10 @@ Apart from narration, the only cost is your coding agent's own usage.
 
 Everything is made and kept on your computer. Narration sends each line's text to the provider you chose. An episode's
 feedback (your comments and rating, frames of the video around your comments, the script and the plan) reaches the
-Explainer Studio team only when you agree to share it; your sources, the video file and the audio never do.
-[PRIVACY.md](PRIVACY.md) lists exactly what leaves your computer.
+Explainer Studio team only when you agree to share it; your sources, the video file and the audio never do. The video
+page's whiteboard view is drawn by Heptabase's web app in a frame, and Save to Heptabase puts the series' cards and
+their pictures on a whiteboard in your Heptabase account. [PRIVACY.md](PRIVACY.md) lists exactly what leaves your
+computer.
 
 ## Getting help
 
@@ -238,4 +240,7 @@ not covered by it. A fork, or a product built on Explainer Studio, needs its own
 that Heptabase made or endorses it. The name and logo appear in the end credits
 (`explainer_studio/scene_kit/credits.py`), the pages' header and icon (`explainer_studio/web/pages.py`) and
 `docs/images/`; replace them there. Shared feedback goes to Heptabase (`explainer_studio/feedback_bundle.py`): point it
-at your own service or turn sharing off.
+at your own service or turn sharing off. The series' whiteboard is drawn and saved by Heptabase
+(`explainer_studio/heptabase_sign_in.py`, `explainer_studio/heptabase_whiteboard.py`, the whiteboard view in
+`explainer_studio/web/static/video.js` and its texts in `explainer_studio/web/locales/`): point it at your own service
+or remove it.

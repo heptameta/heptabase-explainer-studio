@@ -52,6 +52,7 @@ plan or script: it is the shared rulebook every presenter follows.
         ├── design.md  script.yaml  scenes/<scene_id>.py  cover.py  end_credits.py  assets/
         ├── audience-reviews/script.yaml
         ├── feedback.json         comments and survey answers after delivery
+        ├── notes.yaml            the episode's cards for the video page (you write before delivery)
         └── narration/  preview/  render/  delivery-records/   (written by the CLI)
 ```
 
@@ -79,8 +80,8 @@ install script (on Windows), run it in the background as the skill says, and car
 4. Plan review with the user      -> the user says to start, in chat            (workflow/plan-review.md)
 5. Each episode
    design.md -> script.yaml -> script validate -> script audience review (repeat until the gate passes)
-   then in parallel:  narrate   |   scenes/*.py + cover.py + end_credits.py with preview
-   render -> look at the screenshots -> fix and render again if needed -> deliver -> video open
+   then in parallel:  narrate   |   scenes/*.py + cover.py + end_credits.py with preview   |   cards (notes.yaml)
+   render -> look at the screenshots -> fix and render again if needed -> notes check -> deliver -> video open
 6. After delivery                 -> comments, answers, changes, sharing       (workflow/feedback.md)
 ```
 
@@ -173,6 +174,9 @@ Do not write scene code for a scene whose review is still going back and forth.
   and fix every automatic check issue. A scene is not done until you have looked at it.
 - Need pictures, data, audio, 3D or a screen recording? See `references/rendering/assets.md` for the
   `explainer-studio asset ...` commands.
+- Write the episode's cards (`notes.yaml`) in a subagent, as `references/cards.md` says: the chapters, scenes and
+  claim cards that the video page shows in its outline and on the series' whiteboard from the moment of delivery. They
+  need the script and the sources, not the render.
 
 **Render and look.**
 
@@ -182,8 +186,9 @@ Do not write scene code for a scene whose review is still going back and forth.
    check issues too. Render again after fixing. Do not send fixes back to the subagent that wrote the scene; fix small
    things yourself and give larger ones to a new subagent with only that file and what to fix.
 
-**Deliver.** `explainer-studio deliver <episode>` checks that the render has the current narration and no text too
-small, then moves the video, subtitles and cover to the series folder. Then run `explainer-studio video open
+**Deliver.** `explainer-studio deliver <episode>` checks that the render has the current narration, no text too
+small and cards that fit it (`explainer-studio notes check <episode>` checks the cards alone), then moves the video,
+subtitles and cover to the series folder. Then run `explainer-studio video open
 <episode>`, tell the user the episode is ready, and end your turn. In the same message, tell them the scenes where
 audience reviewers still got lost when the review stopped (deliver lists them) and where the script departed from the
 plan.
@@ -204,6 +209,7 @@ or an episode cost (time, tokens, narration), run `explainer-studio cost show [<
 | Scene code | `preview`, `render` | Manim Community syntax and known ManimGL pitfalls are refused |
 | Render | `deliver` | the render was made from the script's current narration (`render/timeline.json`) |
 | Automatic checks | `deliver` | no `text_too_small` in the render |
+| Cards | `deliver` | `notes.yaml` holds every scene of the render once, in order, and its pictures and arrows exist |
 
 ## Changes during production
 
@@ -264,4 +270,5 @@ it: `explainer-studio gap add --kind <presenter|subject|visual|tool|other> [--ep
 | `references/subjects/<subject>.md` | steps 2–5: how a subject is drawn, its honesty rules, how terms are read |
 | `references/languages/<language>.md` | steps 1–5: speaking rate, spoken style, terms, subtitles |
 | `references/rendering/*.md` | step 5: scene code, components, assets, sound, covers, end credits, pitfalls |
+| `references/cards.md` | step 5: the episode's cards and the series' whiteboard |
 | `references/file-formats.md` | every file you write |

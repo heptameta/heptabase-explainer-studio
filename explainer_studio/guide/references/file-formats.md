@@ -19,6 +19,7 @@ The field tables are generated from the package's schemas; the prose and example
 | `episodes/<episode>/scenes/<scene_id>.py`, `cover.py`, `end_credits.py` | you | Python; one `NarratedScene` subclass per scene file |
 | `episodes/<episode>/audience-reviews/script.yaml` | you, from the audience reviewer's reply | yes |
 | `narration/`, `preview/`, `render/`, `delivery-records/`, `feedback.json`, `comment-screenshot-sheets/`, `explainer-studio-versions.json`, `gaps.json`, `spending.jsonl`, `credits.yaml` | the CLI | yes; read them, do not edit them (`credits.yaml` may also be added to and shortened by hand) |
+| `production/heptabase-whiteboard.json` | the video page, once the user presses Save on the series' whiteboard | yes; read it, do not edit it |
 
 Ids (scenes and beats) use lowercase letters, digits and underscores and start with a letter. A scene id is also its
 Python file name. Beat ids are unique within an episode.
@@ -307,6 +308,76 @@ rounds:
 | `note` | text | no |
 <!-- generated:audience-reviews end -->
 
+## notes.yaml
+
+The episode's cards, written while the episode is made and checked by `deliver` (`cards.md` says how to write them). The
+chapters hold every scene of the delivered video once, in order; each scene has its cards.
+
+```yaml
+chapters:
+  - id: ch1                                              # unique in the episode
+    title: Water is densest a little above freezing      # a knowledge point, never a question
+    scenes:
+      - id: density                                      # a scene id of script.yaml, in the video's order
+        title: Water expands when it freezes
+        summary: Below 4 °C water takes more room as it cools, and ice takes more still, so ice is lighter than water.
+        key_frame: two_cups                              # a beat of this scene
+        cards:
+          - id: ice_expands                              # unique in the episode; elsewhere ep02/ice_expands
+            color: yellow                                # optional: yellow, green or red
+            leads_to: [lakes_freeze_top]                 # arrows to cards of this episode
+            continues_from: [ep01/water_is_dense]        # arrows into this card from an earlier episode's cards
+            content: |
+              # Ice floats because water expands when it freezes
+              1. The same water takes <hepta-color type="background" color="yellow">about 9% more room</hepta-color> as ice.
+              2. **Density** is how much mass fits in a given room: more room for the same mass, less density.
+              ![The same mass, as water and as ice](frame:two_cups)
+```
+
+- `content` is Hepta Markdown: the claim as the first heading, then numbered points; `**bold**` marks a term where it
+  is defined and `<hepta-color type="background" color="yellow">…</hepta-color>` highlights a point's key phrase.
+- A picture is a line of its own, `![caption](source)`. The source is `frame:<beat id>` (the delivered video at the end
+  of that beat's line), a `credits.yaml` asset's path, or a picture drawn for the cards in
+  `episodes/<episode>/card-images/`, both relative to `production/`.
+- `explainer-studio notes check <episode>` checks the file against the render (or the latest delivery), as `deliver`
+  does.
+
+<!-- generated:notes begin: edit the source, then run scripts/release.py -->
+**Notes**
+
+| Field | Type | Required |
+|---|---|---|
+| `chapters` | list of Chapter | yes |
+
+**Chapter**
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | text | yes |
+| `title` | text | yes |
+| `scenes` | list of Scene | yes |
+
+**Scene**
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | text | yes |
+| `title` | text | yes |
+| `summary` | text | yes |
+| `key_frame` | text | yes |
+| `cards` | list of Card | yes |
+
+**Card**
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | text | yes |
+| `color` | `yellow` / `green` / `red` or null | no |
+| `leads_to` | list of text | no |
+| `continues_from` | list of text | no |
+| `content` | text | yes |
+<!-- generated:notes end -->
+
 ## Files the tools write
 
 Read these; do not edit them.
@@ -514,6 +585,50 @@ Add an entry by hand for an asset you obtained another way. The credits componen
 | `source_url` | text | yes |
 | `downloaded_at` | time with UTC offset | yes |
 <!-- generated:credits end -->
+
+**`heptabase-whiteboard.json`** (in `production/`): the whiteboard in the user's Heptabase that the series' whiteboard
+was saved to, and the Heptabase id of everything Studio put on it, by its key: a chapter by its id, a card by
+`<episode>/<card id>`, an arrow by `<card key>-><card key>` (an arrow from an earlier episode is kept under the episode
+it leads into), a picture by its source (`frame:<episode>/<beat id>` or its path). Use it to find a card in Heptabase,
+to change it there with the Heptabase CLI or MCP. It exists once the user pressed Save; an episode is on the whiteboard
+once it has `imported_at`, and one without it may not be in Heptabase (its ids were recorded before Heptabase was asked)
+and goes again with the same ids. Deleting the file unlinks the whiteboard (it stays in Heptabase; the next save makes a
+new one). No token is ever written to it.
+
+<!-- generated:heptabase-whiteboard begin: edit the source, then run scripts/release.py -->
+**HeptabaseWhiteboard**
+
+| Field | Type | Required |
+|---|---|---|
+| `issuer` | text | yes |
+| `account_id` | text | yes |
+| `whiteboard_id` | text | yes |
+| `files` | mapping | yes |
+| `episodes` | mapping | yes |
+
+**HeptabaseWhiteboardEpisode**
+
+| Field | Type | Required |
+|---|---|---|
+| `imported_at` | time with UTC offset or null | no |
+| `section_id` | text | yes |
+| `chapters` | mapping | yes |
+| `cards` | mapping | yes |
+| `connections` | mapping | yes |
+
+**HeptabaseWhiteboardChapter**
+
+| Field | Type | Required |
+|---|---|---|
+| `section_id` | text | yes |
+
+**HeptabaseWhiteboardCard**
+
+| Field | Type | Required |
+|---|---|---|
+| `card_id` | text | yes |
+| `card_instance_id` | text | yes |
+<!-- generated:heptabase-whiteboard end -->
 
 **`spending.jsonl`**: one line per paid call:
 `{kind, spent_at, episode_id, provider_name, character_count, cost_usd, is_estimated}`. `kind` says what was paid for;

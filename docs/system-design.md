@@ -173,7 +173,7 @@ from the plan page keeps the agent's comments and key order.
 |---|---|---|
 | Series folder root | Delivered videos, subtitles and covers | `deliver` |
 | `production/` | Everything else about the series: plan, research, scripts, scene code, narration, renders, delivery records, feedback, gaps, spending, credits | the agent and the command |
-| User config directory | `credentials.toml` (narration keys, owner-only), `settings.toml` (dev mode), `model-prices.toml` (the price table) | `setup narration`, `dev-mode`, the developer |
+| User config directory | `credentials.toml` (narration keys and the Heptabase sign-in, owner-only), `settings.toml` (dev mode), `model-prices.toml` (the price table) | `setup narration`, the video page's sign-in, `dev-mode`, the developer |
 | User data directory | Programs `setup` installs: ffmpeg, TinyTeX (on Windows, under `ProgramData` when the user path has spaces or non-ASCII characters), Blender, map data | `setup` |
 | The system's user font folder | The fonts the videos use | `setup` |
 | Playwright's own folder | The Chromium that screen recordings use | `setup playwright` |
@@ -183,6 +183,16 @@ from the plan page keeps the agent's comments and key order.
 Nothing about a series is kept outside its folder except the page server's runtime info and the agent's scratch files.
 A key is never in the series folder: narration reads it from the provider's environment variable or from
 `credentials.toml`.
+
+## The series' whiteboard
+
+The video page shows every delivered episode's cards on one whiteboard for the series, drawn by Heptabase: the page
+embeds the Heptabase web app's embedded whiteboard page in an iframe. Studio owns the content, the ids and the layout;
+Heptabase measures, draws and stores, and knows nothing of series or episodes. Until the user saves, the cards never
+leave the computer. **Save to Heptabase** signs in once per computer and puts the episodes on a new whiteboard in the
+user's Heptabase, linked from `production/heptabase-whiteboard.json`; each episode delivered later is added once, and
+the whiteboard is the user's from then on. How each step works, and the messages and requests Studio relies on from
+Heptabase, are in [series-whiteboard.md](series-whiteboard.md).
 
 ## What leaves the computer
 
@@ -197,6 +207,7 @@ What users are told about this, feedback sharing above all, is in [PRIVACY.md](.
 | GitHub | Reading release tags; installing a release | `doctor` (at most daily), `upgrade` |
 | The sites the install scripts, `setup` and `upgrade` download from (astral.sh for uv, PyPI, GitHub, CTAN mirrors for TeX packages, Blender, Playwright's browser) | Downloads | installing, `setup`, `upgrade` |
 | The Heptabase feedback endpoint | A feedback bundle | `feedback share` or the video page's share button, only with the user's agreement |
+| Heptabase (its OAuth server and REST API, and its web app's embedded whiteboard page in the video page) | The embedded page's load (the cards stay in the browser); the sign-in and the account it is for; then the series', episodes' and chapters' titles, the cards, their pictures and where they go, onto a whiteboard in the user's own Heptabase | The page load with the whiteboard view (or in the background for a saved series with episodes to add); the rest with the video page's **Save to Heptabase**, and once saved, every episode not on it yet whenever one of the series' video pages opens |
 
 The macOS voice and the background music are made on the computer. A feedback bundle carries the episode's
 `feedback.json`, its comment screenshot sheets, the `metadata.json`, `script.yaml` and `timeline.json` of every delivery
