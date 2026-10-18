@@ -16,6 +16,11 @@ in [UPGRADING.md](UPGRADING.md).
 - The agent writes each episode's cards in `notes.yaml` while it makes the episode, and `deliver` checks them against
   the render (`explainer-studio notes check`); `deliver --skip-notes-check` delivers an episode without cards.
 
+### Changed
+
+- The video page keeps its modes in its address (`?modes=theater,outline`), so a reload, Back or a new tab shows the
+  same screen; a page opened by `video open` starts with none on.
+
 ### Fixed
 
 - The video page's keys work with Zhuyin and other input methods on.
