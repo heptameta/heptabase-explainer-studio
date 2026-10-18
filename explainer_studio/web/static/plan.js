@@ -92,7 +92,7 @@ function buildBudgetField(plan) {
       input.value = input.dataset.saved;
       setFieldError(input, null);
       input.blur();
-    } else if (event.key === 'Enter' && !checkIsImeEnter(event)) {
+    } else if (event.key === 'Enter' && !checkIsInputMethodKey(event)) {
       event.preventDefault();
       input.blur();
     }
@@ -241,7 +241,7 @@ function buildVoiceProperty(plan) {
     await writePlanField(otherInput, fieldPath, value) && refreshPage();
   }
   otherInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !checkIsImeEnter(event)) { event.preventDefault(); writeOtherVoice(); }
+    if (event.key === 'Enter' && !checkIsInputMethodKey(event)) { event.preventDefault(); writeOtherVoice(); }
     if (event.key === 'Escape') { otherInput.hidden = true; voiceSelect.value = currentVoice || ''; showHint(); }
   });
   otherInput.addEventListener('blur', writeOtherVoice);

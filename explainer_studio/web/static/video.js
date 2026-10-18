@@ -2,8 +2,9 @@
 // mode) and sharing with the team.
 // Keys: Space plays or pauses, the arrows move 5 s, M adds a comment (the video pauses; Enter saves and plays on,
 // Esc cancels), C turns subtitles on or off, and T, O and W turn theater mode, the outline and the whiteboard on or
-// off. The video element is made once; everything else is shown again from the server's JSON whenever feedback.json or
-// the delivery changes, so the agent's changes show up without a reload.
+// off; a letter key works whatever the keyboard layout or input method types with it (resolveShortcutKey). The video
+// element is made once; everything else is shown again from the server's JSON whenever feedback.json or the delivery
+// changes, so the agent's changes show up without a reload.
 'use strict';
 
 const EPISODE_ID = BOOT.episodeId;
@@ -1128,7 +1129,7 @@ function startComment() {
   const input = buildElement('textarea', {rows: 2, 'aria-label': translate('video.composer.label')});
   input.addEventListener('input', () => growTextarea(input));
   input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey && !checkIsImeEnter(event)) {
+    if (event.key === 'Enter' && !event.shiftKey && !checkIsInputMethodKey(event)) {
       event.preventDefault();
       submitComment(input.value);
     }
@@ -1260,7 +1261,7 @@ function buildComment(comment) {
     };
     textNode.addEventListener('input', () => growTextarea(textNode));
     textNode.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' && !event.shiftKey && !checkIsImeEnter(event)) {
+      if (event.key === 'Enter' && !event.shiftKey && !checkIsInputMethodKey(event)) {
         event.preventDefault();
         finishEditing(true);
       }
@@ -1661,8 +1662,8 @@ async function refreshPage() {
 
 window.addEventListener('keydown', (event) => {
   if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !pageData) return;
-  if (checkIsTyping(event.target) || (nodes.dialog && nodes.dialog.open)) return;
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+  if (checkIsTyping(event.target) || checkIsInputMethodKey(event) || (nodes.dialog && nodes.dialog.open)) return;
+  const key = resolveShortcutKey(event);
   // the whiteboard shows no video: playing and commenting wait until it closes
   if (checkIsWhiteboardModeShown() && [' ', 'ArrowLeft', 'ArrowRight', 'm', 'c'].includes(key)) return;
   if (key === ' ') togglePlay();
