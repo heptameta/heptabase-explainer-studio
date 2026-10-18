@@ -126,9 +126,20 @@ function watchPageDigest(query, getCurrentDigest, onChange) {
   document.addEventListener('visibilitychange', pollPageDigest);
 }
 
-// Enter that confirms an input method's candidate (Chinese, Japanese) is not a save.
-function checkIsImeEnter(event) {
+// A key an input method (Chinese, Japanese) takes while it composes text, such as the Enter that confirms a candidate:
+// neither a save nor a shortcut.
+function checkIsInputMethodKey(event) {
   return event.isComposing || event.keyCode === 229;
+}
+
+// The key a shortcut goes by: the letter the key types on a Latin layout (QWERTY, AZERTY, Dvorak), else the letter at
+// its place on a US keyboard, for layouts and input methods that type something else there (Zhuyin's W types ㄊ).
+// Other keys (Space, the arrows) go by their KeyboardEvent.key.
+function resolveShortcutKey(event) {
+  if (/^[a-z]$/i.test(event.key)) return event.key.toLowerCase();
+  const letterMatch = /^Key([A-Z])$/.exec(event.code);
+  if (letterMatch) return letterMatch[1].toLowerCase();
+  return event.code === 'Space' ? ' ' : event.key;
 }
 
 function checkIsTyping(target) {
