@@ -6,6 +6,16 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Added
+
+- The video page has an **Outline** beside the video: the episode's chapters and scenes, each with a key frame and its
+  core idea. Choosing a scene plays it.
+- **Whiteboard** shows every delivered episode's cards on one whiteboard for the series, drawn by Heptabase, with arrows
+  between the cards, also across episodes. **Save to Heptabase** puts it in the user's own Heptabase after a one-time
+  sign-in; each episode delivered later is added to it when its video page opens.
+- The agent writes each episode's cards in `notes.yaml` while it makes the episode, and `deliver` checks them against
+  the render (`explainer-studio notes check`); `deliver --skip-notes-check` delivers an episode without cards.
+
 ## [1.1.1] - 2026-10-16
 
 ### Fixed

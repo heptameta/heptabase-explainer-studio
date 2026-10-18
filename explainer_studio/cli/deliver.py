@@ -11,16 +11,20 @@ from .common import add_series_option, open_series, print_result
 
 @click.command()
 @click.argument("episode_id", metavar="EPISODE")
+@click.option("--skip-notes-check", "should_skip_notes_check", is_flag=True,
+              help="Deliver without checking the episode's cards (notes.yaml), when the user wants none. The video "
+                   "page then has no outline for it, and the series' whiteboard gets no cards from it.")
 @add_series_option
-def deliver(episode_id: str, series_path: Path | None) -> None:
-    """Check the render and its automatic checks, then move the video, subtitles and cover to the series folder."""
+def deliver(episode_id: str, should_skip_notes_check: bool, series_path: Path | None) -> None:
+    """Check the render, its automatic checks and the episode's cards (`notes check`), then move the video, subtitles
+    and cover to the series folder."""
     from ..cost import compute_cost_report, filter_cost_report_to_episode, format_cost_report
     from ..deliver import deliver as deliver_episode
     from ..dev_mode import check_is_dev_mode_on
     from ..model_prices import load_dev_mode_model_prices
 
     series = open_series(series_path, episode_id)
-    delivery_result = deliver_episode(series, episode_id)
+    delivery_result = deliver_episode(series, episode_id, should_check_notes=not should_skip_notes_check)
     record = delivery_result.record
     print_result(f"delivered {episode_id} at {record.delivered_at.isoformat()}:")
     for file_name in record.files.list_file_names():

@@ -18,6 +18,7 @@ from typing import Any
 
 from .. import __version__, presenters, question_types
 from ..background_music_providers import PROVIDER_BY_NAME_MAP as BACKGROUND_MUSIC_PROVIDER_BY_NAME_MAP
+from ..chapters import compute_page_chapters
 from ..cost import (
     build_work_totals,
     check_has_episode_work,
@@ -28,7 +29,12 @@ from ..cost import (
     get_step_count,
     list_steps,
 )
-from ..deliver import list_delivery_record_dir_paths, load_delivered_timeline, load_latest_delivery_record
+from ..deliver import (
+    find_latest_delivery_record,
+    list_delivered_episodes,
+    load_latest_delivered_timeline,
+    load_latest_delivery_record,
+)
 from ..dev_mode import check_is_dev_mode_on
 from ..errors import StudioError
 from ..feedback import (
@@ -38,13 +44,12 @@ from ..feedback import (
     resolve_current_survey_answer,
 )
 from ..feedback_bundle import resolve_unshared_items
-from ..file_io import convert_yaml_document_to_plain_data, read_yaml_document
 from ..gaps import load_gaps
 from ..model_prices import load_dev_mode_model_prices
 from ..narration_providers import PROVIDER_BY_NAME_MAP
 from ..paths import EPISODE_ID_PATTERN, Series
+from ..plan import list_raw_episode_ids, read_raw_plan
 from ..schemas.cost import EPISODE_STEPS, PLANNING_STEPS, CostReport, CostReportStep
-from ..schemas.delivery_record import DeliveryRecord
 from ..schemas.feedback import CommentAnchor, MomentAnchor
 from ..schemas.model_prices import ModelPrice
 from ..schemas.plan import Plan
@@ -96,14 +101,8 @@ def _read_bytes_or_empty(path: Path) -> bytes:
 
 def _read_raw_plan(series: Series) -> tuple[dict[str, Any], list[str], str | None]:
     """The plan as written (even when it is not valid), its problems, and a parse error."""
-    try:
-        document = read_yaml_document(series.plan_file_path)
-    except StudioError as error:
-        return {}, [], f"{error.what}: {error.why}"
-    except OSError as error:
-        return {}, [], str(error)
-    raw_plan = convert_yaml_document_to_plain_data(document)
-    return (raw_plan if isinstance(raw_plan, dict) else {}), validate_plan_document(document), None
+    document, raw_plan, error = read_raw_plan(series)
+    return raw_plan, (validate_plan_document(document) if document is not None else []), error
 
 
 def _find_user_language_code(raw_plan: dict[str, Any]) -> Any:
@@ -115,24 +114,10 @@ def read_page_language_code(series: Series) -> str:
     return resolve_page_language_code(_find_user_language_code(_read_raw_plan(series)[0]))
 
 
-def _list_episode_ids(raw_plan: dict[str, Any]) -> list[str]:
-    return [raw_episode["id"] for raw_episode in raw_plan.get("episodes") or []
-            if isinstance(raw_episode, dict) and isinstance(raw_episode.get("id"), str)
-            and EPISODE_ID_PATTERN.match(raw_episode["id"])]
-
-
-def _find_latest_delivery_record(series: Series, episode_id: str) -> DeliveryRecord | None:
-    try:
-        return load_latest_delivery_record(series, episode_id)
-    except StudioError:
-        return None
-
-
 def _find_delivered_duration_seconds(series: Series, episode_id: str) -> float | None:
     """The length of the latest delivery's video, from its record's timeline."""
-    record_dir_paths = list_delivery_record_dir_paths(series, episode_id)
     try:
-        timeline = load_delivered_timeline(series, record_dir_paths[-1]) if record_dir_paths else None
+        timeline = load_latest_delivered_timeline(series, episode_id)
     except StudioError:
         return None
     return timeline.duration_seconds if timeline else None
@@ -152,9 +137,9 @@ def _format_narration_label(narration_settings: Any, language_code: str) -> str 
 # Plan page -----------------------------------------------------------------------------------------------------------
 def compute_plan_page_digest(series: Series) -> str:
     raw_plan, _, _ = _read_raw_plan(series)
-    episode_ids = _list_episode_ids(raw_plan)
+    episode_ids = list_raw_episode_ids(raw_plan)
     latest_delivery_times = [(episode_id, record.delivered_at) for episode_id in episode_ids
-                             if (record := _find_latest_delivery_record(series, episode_id))]
+                             if (record := find_latest_delivery_record(series, episode_id))]
     scripted_episode_ids = [episode_id for episode_id in episode_ids
                             if series.get_episode_paths(episode_id).script_file_path.is_file()]
     return _compute_digest(compute_plan_version(_read_bytes_or_empty(series.plan_file_path)), latest_delivery_times,
@@ -172,7 +157,7 @@ def compute_plan_page(series: Series) -> dict[str, Any]:
         is_valid_id = isinstance(episode_id, str) and bool(EPISODE_ID_PATTERN.match(episode_id))
         is_known = (presenter_name in playbooks_by_presenter_name_map
                     and question_type in question_types.QUESTION_TYPE_BY_NAME_MAP)
-        latest_delivery_record = _find_latest_delivery_record(series, episode_id) if is_valid_id else None
+        latest_delivery_record = find_latest_delivery_record(series, episode_id) if is_valid_id else None
         episodes.append({
             "id": episode_id,
             "isDelivered": latest_delivery_record is not None,
@@ -239,7 +224,10 @@ def convert_comment_anchor_to_page_json(anchor: CommentAnchor) -> dict[str, Any]
 
 def compute_video_page_digest(series: Series, episode_id: str) -> str:
     latest_delivery = find_latest_delivery(series, episode_id)
+    # every episode's notes: the series shares one whiteboard
+    notes_stats = [(path.parent.name, _read_stat(path)) for path in sorted(series.episodes_dir_path.glob("*/notes.yaml"))]
     return _compute_digest(_read_bytes_or_empty(series.get_episode_paths(episode_id).feedback_file_path),
+                           *notes_stats,
                            compute_plan_version(_read_bytes_or_empty(series.plan_file_path)),
                            _read_stat(series.gaps_file_path),
                            latest_delivery["latest_delivery_record"].delivered_at if latest_delivery else None,
@@ -263,11 +251,7 @@ def compute_video_page(series: Series, episode_id: str) -> dict[str, Any]:
                 for comment in feedback.comments]
     current_survey_answers = [answer for kind in SURVEY_ANSWER_MODEL_BY_KIND_MAP
                               if (answer := resolve_current_survey_answer(feedback, kind, latest_delivery_time))]
-    delivered_episodes = [{"id": delivered_episode_id,
-                           "title": str(raw_episode_by_id_map.get(delivered_episode_id, {}).get("title")
-                                        or delivered_episode_id)}
-                          for delivered_episode_id in _list_episode_ids(raw_plan)
-                          if _find_latest_delivery_record(series, delivered_episode_id)]
+    delivered_episodes = list_delivered_episodes(series)
     return {
         "languageCode": resolve_page_language_code(_find_user_language_code(raw_plan)),
         "pageDigest": compute_video_page_digest(series, episode_id),
@@ -290,6 +274,8 @@ def compute_video_page(series: Series, episode_id: str) -> dict[str, Any]:
         "isDevModeOn": check_is_dev_mode_on(),
         "hasUnsharedFeedback": resolve_unshared_items(feedback, load_gaps(series)).has_feedback,
         "episodes": delivered_episodes,
+        # the outline, when notes.yaml fits the delivered video (the whiteboard has its own API)
+        "chapters": compute_page_chapters(series, episode_id),
     }
 
 
@@ -359,6 +345,3 @@ def format_page_html(page_name: str, language_code: str, title: str, base_url: s
                                favicon=FAVICON_URL, static=f"{base_url}/static",
                                header=_format_header_html(language_code), boot=_serialize_json_for_script(boot))
 
-
-def read_series_title(series: Series) -> str:
-    return str(_read_raw_plan(series)[0].get("title") or series.root_dir_path.name)

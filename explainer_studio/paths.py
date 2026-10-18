@@ -121,6 +121,11 @@ class Series:
         return self.production_dir_path / "credits.yaml"
 
     @property
+    def heptabase_whiteboard_file_path(self) -> Path:
+        """The Heptabase whiteboard the series' whiteboard was saved to, once the user saved it."""
+        return self.production_dir_path / "heptabase-whiteboard.json"
+
+    @property
     def sources_dir_path(self) -> Path:
         return self.production_dir_path / "sources"
 
@@ -198,6 +203,10 @@ class EpisodePaths:
     @property
     def feedback_file_path(self) -> Path:
         return self.root_dir_path / "feedback.json"
+
+    @property
+    def notes_file_path(self) -> Path:
+        return self.root_dir_path / "notes.yaml"
 
     @property
     def comment_screenshot_sheets_dir_path(self) -> Path:

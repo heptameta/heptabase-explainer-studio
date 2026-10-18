@@ -30,7 +30,9 @@ When you work in a fork, or in a product or service built on Explainer Studio, r
   `text_too_small` check before `deliver`. Gates read recorded fields; they never judge content.
 - Strict schemas only for data a program consumes (`explainer_studio/schemas/`). Free-form notes stay Markdown.
 - One canonical name per concept (see `docs/glossary.md`). Persisted field names never use a bare `studio`.
-- The package knows nothing about Heptabase's own product. No host switches.
+- The package knows nothing about Heptabase's own product, except the series' whiteboard, which the video page shows
+  with Heptabase's web app and saves to the user's Heptabase (`heptabase_sign_in.py`, `heptabase_whiteboard.py`). No
+  host switches.
 - Nothing private enters this repository, in code, fixtures, docs, commits or pull requests: names of people, private
   materials, users' feedback, local paths.
 
@@ -42,7 +44,7 @@ When you work in a fork, or in a product or service built on Explainer Studio, r
 | A command's arguments and output | `explainer_studio/cli/<command>.py` |
 | The logic that does the work | a top-level module named for the action or concept, or the sub-domains `rendering/` (preview, render, the ManimGL runner, mixing, subtitles, screenshots, automatic checks), `assets/`, `narration_providers/`, `background_music_providers/`, `web/`, `scene_kit/` |
 | Every path inside a series | `explainer_studio/paths.py` |
-| How the parts work together, the concepts, the teaching model | `docs/system-design.md`, `docs/glossary.md`, `docs/teaching-model.md` |
+| How the parts work together, the concepts, the teaching model, the series' whiteboard | `docs/system-design.md`, `docs/glossary.md`, `docs/teaching-model.md`, `docs/series-whiteboard.md` |
 
 ## Conventions
 
@@ -54,7 +56,9 @@ When you work in a fork, or in a product or service built on Explainer Studio, r
 - Never print, log or store API key values outside `credentials.toml`.
 - Python 3.12+, type hints, `from __future__ import annotations`, ruff line length 120.
 - Tests protect behavior that can plausibly regress (formats, gates, parsers, mixing, timing). Do not test constants,
-  schema declarations or registrations. Mark tests that run ManimGL or ffmpeg with `@pytest.mark.render`.
+  schema declarations or registrations. Mark tests that run ManimGL or ffmpeg, also through a helper such as
+  `delivered_series.create_series`, with `@pytest.mark.render`: check-code runs the others without them, and
+  `tests/conftest.py` fails an unmarked one on any computer.
 
 ## Skills to read first
 
@@ -69,9 +73,11 @@ When you work in a fork, or in a product or service built on Explainer Studio, r
 ## Documents that change with the code
 
 - [`docs/system-design.md`](docs/system-design.md) (the pipeline, the components, where data lives, what leaves the
-  computer), [`docs/glossary.md`](docs/glossary.md) (the concepts, by domain) and
-  [`docs/teaching-model.md`](docs/teaching-model.md) (the teaching layers, the presenters and their playbooks): a change
-  to what they describe updates them in the same pull request.
+  computer), [`docs/glossary.md`](docs/glossary.md) (the concepts, by domain),
+  [`docs/teaching-model.md`](docs/teaching-model.md) (the teaching layers, the presenters and their playbooks) and
+  [`docs/series-whiteboard.md`](docs/series-whiteboard.md) (the series' whiteboard: its parts, its flows, and the
+  messages and requests Studio relies on from Heptabase): a change to what they describe updates them in the same pull
+  request.
 - [`PRIVACY.md`](PRIVACY.md) is a promise to users, so it must never say less than what is sent. A change to what a
   feedback bundle carries, or to anything that leaves the computer, updates it in the same pull request, together with
   the other places that tell users the same thing: the consent text in `workflow/feedback.md` and the language

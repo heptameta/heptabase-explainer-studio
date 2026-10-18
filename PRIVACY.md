@@ -1,14 +1,17 @@
 # Privacy
 
 Explainer Studio runs on your computer, and what it makes stays there: your sources, the series folder, the videos.
-Two kinds of things leave it: the feedback you choose to share with Heptabase, and what the services that do the work
-for you need, such as the narration provider you chose. This page says what each one is and what happens to it.
+Three kinds of things leave it: the feedback you choose to share with Heptabase, the series' whiteboard once you save
+it to your Heptabase, and what the services that do the work for you need, such as the narration provider you chose.
+This page says what each one is and what happens to it.
 
 ## What leaves your computer
 
 | Where it goes | What | When | Whose terms apply |
 |---|---|---|---|
 | Heptabase | An episode's feedback bundle | Only when you agree to share it | This page |
+| Heptabase | The video page's whiteboard view loads Heptabase's web app in a frame, which draws the cards inside your browser; the cards do not leave your computer for it | When you open the whiteboard view, and in the background when a saved series has episodes to add | Heptabase's |
+| Heptabase | The sign-in to your Heptabase account (Heptabase tells Studio which account signed in and its email, which Studio keeps on this computer to show where saving goes), then the series' title, each episode's and chapter's title, the cards, their pictures (frames of your videos, and pictures from the series folder) and where each goes, to a whiteboard in your own Heptabase account | Only once you press Save to Heptabase on the video page; after that, when you open any of the series' video pages, every delivered episode not on the whiteboard yet | Heptabase's, under your account |
 | The narration provider you chose (ElevenLabs, OpenAI or VoAI) | The narration text and voice settings, with your key | When the agent narrates an episode, and when you test your key | The provider's, under your account |
 | Image and data sites (Wikimedia Commons, Bioicons, Wikipedia, Our World in Data, the World Bank) | Search queries, and the files the agent downloads | When the agent looks for pictures or data | Each site's |
 | Web pages the agent records | A visit by a browser with no window | When the agent records a page for a video | Each site's |

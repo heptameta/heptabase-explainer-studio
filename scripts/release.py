@@ -143,7 +143,18 @@ def format_field_rows(model: type[BaseModel]) -> list[str]:
 def generate_schema_tables() -> dict[Path, str]:
     if not FILE_FORMATS_MD.exists():
         return {}
-    from explainer_studio.schemas import audience_review, credits, feedback, gaps, narration, plan, script, timeline
+    from explainer_studio.schemas import (
+        audience_review,
+        credits,
+        feedback,
+        gaps,
+        heptabase_whiteboard,
+        narration,
+        notes,
+        plan,
+        script,
+        timeline,
+    )
 
     models_by_block_name_map = {
         "plan": [plan.Plan, plan.Audience, plan.Misconception, plan.Episode, plan.ExcludedTopic],
@@ -157,6 +168,9 @@ def generate_schema_tables() -> dict[Path, str]:
                      feedback.Resolution, feedback.RatingAnswer, feedback.WatchDepthAnswer],
         "gaps": [gaps.Gap],
         "credits": [credits.Credits, credits.Credit],
+        "notes": [notes.Notes, notes.Chapter, notes.Scene, notes.Card],
+        "heptabase-whiteboard": [heptabase_whiteboard.HeptabaseWhiteboard, heptabase_whiteboard.HeptabaseWhiteboardEpisode,
+                                 heptabase_whiteboard.HeptabaseWhiteboardChapter, heptabase_whiteboard.HeptabaseWhiteboardCard],
     }
     text = FILE_FORMATS_MD.read_text(encoding="utf-8")
     for block_name, models in models_by_block_name_map.items():
