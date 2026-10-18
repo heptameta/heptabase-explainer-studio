@@ -34,9 +34,9 @@ function saveIsOn(name, isOn) {
 }
 
 let isShowingSubtitles = loadIsOn('subtitles');
-let isTheaterModeOn = loadIsOn('theaterMode');
-let isOutlineModeOn = loadIsOn('outlineMode');
-let isWhiteboardModeOn = loadIsOn('whiteboardMode');
+let isTheaterModeOn = false;
+let isOutlineModeOn = false;
+let isWhiteboardModeOn = false;
 const nodes = {};
 
 async function fetchPageJson() {
@@ -78,7 +78,56 @@ function toggleSubtitles() {
 // - the whiteboard: the series' whiteboard (below) in place of the video, filling the page under the toolbar; with no
 //   video in view, the comment and subtitle buttons are off and the rest of the page is hidden. Theater mode and the
 //   outline come back as they were when it closes, and either of their buttons closes it.
-// Each is remembered for the next page.
+// The modes that are on are in the page's address (`?modes=theater,outline`), so a reload, Back and Forward, and the
+// same address in another tab or browser show the same screen, and switching episodes keeps them; a page opened
+// without them (from the plan page, or by `video open`) shows the video with none on. Showing or hiding the whiteboard
+// changes what the page shows, as going to another page does, so it adds a history entry that Back returns from;
+// theater mode and the outline only change the layout and update the current entry. Subtitles are a preference for
+// every video, remembered in the browser.
+const MODES_QUERY_NAME = 'modes';
+const MODE_NAMES = ['theater', 'outline', 'whiteboard'];  // in the toolbar's order, which the address keeps
+
+// The modes the page's address turns on; a name it does not know is ignored.
+function setModesFromUrl() {
+  const modeNames = (new URLSearchParams(window.location.search).get(MODES_QUERY_NAME) || '').split(',');
+  isTheaterModeOn = modeNames.includes('theater');
+  isOutlineModeOn = modeNames.includes('outline');
+  isWhiteboardModeOn = modeNames.includes('whiteboard');
+}
+
+// `?modes=...` with the modes on now, or '' with none; the commas stay as they are, readable.
+function buildModesQuery() {
+  const isOnByModeNameMap = {theater: isTheaterModeOn, outline: isOutlineModeOn, whiteboard: isWhiteboardModeOn};
+  const modeNames = MODE_NAMES.filter((name) => isOnByModeNameMap[name]);
+  return modeNames.length ? `?${MODES_QUERY_NAME}=${modeNames.join(',')}` : '';
+}
+
+// The page's address with the modes on now, and the rest of its query but the sign-in's id, which is read once.
+function buildPageUrl() {
+  const pageUrl = new URL(window.location.href);
+  pageUrl.searchParams.delete(MODES_QUERY_NAME);
+  pageUrl.searchParams.delete(SIGN_IN_QUERY_NAME);
+  const queryParts = [pageUrl.searchParams.toString(), buildModesQuery().slice(1)].filter(Boolean);
+  return pageUrl.pathname + (queryParts.length ? `?${queryParts.join('&')}` : '') + pageUrl.hash;
+}
+
+// Puts the modes on now in the page's address: in a new history entry when the whiteboard showed or hid
+// (`wasWhiteboardShown` is whether it showed before the change), else in the current one.
+function recordModesInUrl(wasWhiteboardShown) {
+  const nextUrl = buildPageUrl();
+  if (nextUrl === window.location.pathname + window.location.search + window.location.hash) return;
+  if (checkIsWhiteboardModeShown() !== wasWhiteboardShown) history.pushState(null, '', nextUrl);
+  else history.replaceState(history.state, '', nextUrl);
+}
+
+setModesFromUrl();
+
+// Back and Forward between this page's history entries: the modes in their addresses.
+window.addEventListener('popstate', () => {
+  setModesFromUrl();
+  applyModes();
+});
+
 function checkIsOutlineAvailable() {
   return Boolean(video && pageData.chapters);
 }
@@ -93,12 +142,6 @@ function checkIsWhiteboardModeShown() {
 
 function checkIsOutlineModeShown() {
   return isOutlineModeOn && checkIsOutlineAvailable() && !checkIsWhiteboardModeShown();
-}
-
-function saveModes() {
-  saveIsOn('theaterMode', isTheaterModeOn);
-  saveIsOn('outlineMode', isOutlineModeOn);
-  saveIsOn('whiteboardMode', isWhiteboardModeOn);
 }
 
 function applyModes() {
@@ -129,25 +172,28 @@ function applyModes() {
 
 function toggleTheaterMode() {
   if (!video) return;
-  isTheaterModeOn = checkIsWhiteboardModeShown() || !isTheaterModeOn;
+  const wasWhiteboardShown = checkIsWhiteboardModeShown();
+  isTheaterModeOn = wasWhiteboardShown || !isTheaterModeOn;
   isWhiteboardModeOn = false;
-  saveModes();
+  recordModesInUrl(wasWhiteboardShown);
   applyModes();
   if (isTheaterModeOn) video.scrollIntoView({block: 'start'});
 }
 
 function toggleOutlineMode() {
   if (!checkIsOutlineAvailable()) return;
-  isOutlineModeOn = checkIsWhiteboardModeShown() || !isOutlineModeOn;
+  const wasWhiteboardShown = checkIsWhiteboardModeShown();
+  isOutlineModeOn = wasWhiteboardShown || !isOutlineModeOn;
   isWhiteboardModeOn = false;
-  saveModes();
+  recordModesInUrl(wasWhiteboardShown);
   applyModes();
 }
 
 function toggleWhiteboardMode() {
   if (!checkIsWhiteboardAvailable()) return;
-  isWhiteboardModeOn = !checkIsWhiteboardModeShown();
-  saveModes();
+  const wasWhiteboardShown = checkIsWhiteboardModeShown();
+  isWhiteboardModeOn = !wasWhiteboardShown;
+  recordModesInUrl(wasWhiteboardShown);
   applyModes();
 }
 
@@ -1065,12 +1111,8 @@ function mountWhiteboard() {
 // Back from Heptabase's sign-in: how it ended, and the save goes on when a save was what needed it (only on this
 // page: the sign-in names the page that started it).
 async function loadWhiteboard() {
-  const pageUrl = new URL(window.location.href);
-  const signInId = pageUrl.searchParams.get(SIGN_IN_QUERY_NAME);
-  if (signInId) {
-    pageUrl.searchParams.delete(SIGN_IN_QUERY_NAME);
-    history.replaceState(history.state, '', pageUrl.pathname + pageUrl.search + pageUrl.hash);
-  }
+  const signInId = new URLSearchParams(window.location.search).get(SIGN_IN_QUERY_NAME);
+  if (signInId) history.replaceState(history.state, '', buildPageUrl());
   whiteboard.page = await fetchWhiteboardPage(signInId);
   if (!whiteboard.page) return;
   if (signInId) {
@@ -1542,7 +1584,7 @@ function showHead() {
       deliveredEpisodes.map((episode) => buildElement('option', {value: episode.id, selected: episode.id === EPISODE_ID},
         `${episode.id.toUpperCase()} · ${episode.title}`)));
     episodeSelect.addEventListener('change', () => {
-      window.location.href = `${BOOT.baseUrl}/video/${episodeSelect.value}`;
+      window.location.href = `${BOOT.baseUrl}/video/${episodeSelect.value}${buildModesQuery()}`;
     });
     nodes.switcher.replaceChildren(episodeSelect);
   } else {
