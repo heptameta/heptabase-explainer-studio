@@ -202,7 +202,7 @@ Check the render, its automatic checks and the episode's cards (`notes check`), 
 to the series folder.
 
 - `--skip-notes-check`: Deliver without checking the episode's cards (notes.yaml), when the user wants none. The video
-  page then has no outline for it, and the series' whiteboard gets no cards from it.
+  page then has no chapters view for it, and the series' whiteboard gets no cards from it.
 - `--series PATH`: The series folder (default: found by walking up from the current folder).
 
 ### `explainer-studio feedback`

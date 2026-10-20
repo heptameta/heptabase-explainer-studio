@@ -8,8 +8,8 @@ in [UPGRADING.md](UPGRADING.md).
 
 ### Added
 
-- The video page has an **Outline** beside the video: the episode's chapters and scenes, each with a key frame and its
-  core idea. Choosing a scene plays it.
+- The video page has **Chapters**, which reads the episode from top to bottom: each chapter a large frame beside its
+  scenes, with their key frames and core ideas. Choosing a scene plays it in its chapter's frame.
 - **Whiteboard** shows every delivered episode's cards on one whiteboard for the series, drawn by Heptabase, with arrows
   between the cards, also across episodes. **Save to Heptabase** puts it in the user's own Heptabase after a one-time
   sign-in; each episode delivered later is added to it when its video page opens.
@@ -18,8 +18,8 @@ in [UPGRADING.md](UPGRADING.md).
 
 ### Changed
 
-- The video page keeps its modes in its address (`?modes=theater,outline`), so a reload, Back or a new tab shows the
-  same screen; a page opened by `video open` starts with none on.
+- The video page keeps its mode in its address (`?mode=chapters`), so a reload, Back or a new tab shows the same
+  screen; a page opened by `video open` starts with none on.
 
 ### Fixed
 

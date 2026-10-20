@@ -175,8 +175,8 @@ Do not write scene code for a scene whose review is still going back and forth.
 - Need pictures, data, audio, 3D or a screen recording? See `references/rendering/assets.md` for the
   `explainer-studio asset ...` commands.
 - Write the episode's cards (`notes.yaml`) in a subagent, as `references/cards.md` says: the chapters, scenes and
-  claim cards that the video page shows in its outline and on the series' whiteboard from the moment of delivery. They
-  need the script and the sources, not the render.
+  claim cards that the video page shows in its chapters view and on the series' whiteboard from the moment of delivery.
+  They need the script and the sources, not the render.
 
 **Render and look.**
 

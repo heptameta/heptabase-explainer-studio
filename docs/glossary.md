@@ -218,7 +218,7 @@ episode and later given the agent's resolution, and answers to the video page's 
 page or in chat; which video an item is about follows from when it was given (`episodes/<episode>/feedback.json`).
 
 **cards**: An episode's prepared notes, one claim each, in its chapters and scenes (`episodes/<episode>/notes.yaml`):
-the series' whiteboard shows them, and the video page's outline lists their chapters and scenes. `deliver`
+the series' whiteboard shows them, and the video page's chapters view lists their chapters and scenes. `deliver`
 requires cards that fit the render.
 
 **series' whiteboard**: Every delivered episode's cards on one whiteboard, drawn by Heptabase on the video page. The
@@ -380,8 +380,8 @@ Smaller names with a stable meaning, by domain. Each says which abstraction it b
   good, okay or bad; how closely the user watched (asked in dev mode).
 - **feedback id** (feedback): The UUID an episode's feedback and all its bundles carry.
 - **share** (feedback bundle): Sending a feedback bundle to the team with the user's agreement (`feedback share`).
-- **chapter**, **outline** (cards): A stretch of an episode's argument, holding its scenes; the list of them beside the
-  video on the video page, to jump to.
+- **chapter**, **chapters view** (cards): A stretch of an episode's argument, holding its scenes; the video page's
+  view of them, read from top to bottom, each chapter playing in its own frame.
 - **save to Heptabase**, **unlink** (series' whiteboard): Putting the series' whiteboard in the user's Heptabase;
   forgetting the linked whiteboard, which stays there.
 

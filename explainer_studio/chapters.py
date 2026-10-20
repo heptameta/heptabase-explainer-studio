@@ -1,6 +1,6 @@
-"""The episode's cards (notes.yaml): `notes check`, and the outline of the video page, the latest delivery's
+"""The episode's cards (notes.yaml): `notes check`, and the video page's chapters view, the latest delivery's
 scenes grouped into the chapters of notes.yaml, each scene with its summary and its key frame. The cards are written
-while the episode is made and must fit its render before it is delivered, so the outline and the series'
+while the episode is made and must fit its render before it is delivered, so the chapters view and the series'
 whiteboard have them from the moment of delivery. A card's pictures are the delivered video's frames (grabbed when they
 are first asked for) or files in production/: a credited asset, or a picture made for the episode's cards in
 `episodes/<episode>/card-images/`."""
@@ -206,7 +206,7 @@ def load_delivered_notes(series: Series, episode_id: str) -> tuple[Notes, Timeli
 
 
 def compute_page_chapters(series: Series, episode_id: str) -> list[dict[str, Any]] | None:
-    """The outline's chapters, or None when the episode has no notes.yaml or it does not fit the delivered video
+    """The chapters view's chapters, or None when the episode has no notes.yaml or it does not fit the delivered video
     (`explainer-studio notes check` says why)."""
     delivered_notes = load_delivered_notes(series, episode_id)
     if delivered_notes is None:

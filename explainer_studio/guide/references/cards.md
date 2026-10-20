@@ -4,8 +4,9 @@ While each episode is made, you write its cards in `production/episodes/<episode
 `file-formats.md`); `deliver` checks them. From the moment of delivery, the video page shows them in two views, next
 to theater mode:
 
-- **Outline**: the episode's chapters beside the video, each with its scenes: a key frame, the scene's title, where it
-  starts and its core idea in a sentence or two. Choosing a scene plays it. The outline shows no cards.
+- **Chapters**: the episode read from top to bottom, each chapter a large frame beside its scenes: a key frame, the
+  scene's title, where it starts and its core idea in a sentence or two. Choosing a scene plays it in its chapter's
+  frame. The chapters view shows no cards.
 - **Whiteboard**: one whiteboard for the whole series, drawn by Heptabase. Each delivered episode is a section, its
   chapters are sections inside it, each scene is a column of cards, and arrows join the cards. The user can save it to
   their Heptabase with one button; after that, each newly delivered episode is added to the same whiteboard when its
@@ -47,8 +48,8 @@ card this way:
 ## Chapters and scenes
 
 - Each scene of the video appears once, in order. Its `title` is the knowledge point it teaches and its `summary` that
-  point in one or two sentences; they are what the video page's outline lists, so a reader sees the episode's knowledge
-  before watching.
+  point in one or two sentences; they are what the video page's chapters view lists, so a reader sees the episode's
+  knowledge before watching.
 - A chapter is a stretch of the argument: divide by the argument's structure and how much each stretch carries, with
   no fixed size. Its title is also a knowledge point, never a question or a teaser.
 - A scene usually has two to four cards, a card two to six points. A point that needs three sentences is probably two
