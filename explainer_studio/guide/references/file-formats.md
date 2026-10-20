@@ -37,7 +37,7 @@ narration:                        # required by narrate; fields depend on the pr
   provider_name: elevenlabs
   voice_id: JBFqnCBsd6RMkjVDRZzb
   model_id: eleven_v4
-background_music:                 # optional; omitted means synthesized-piano; {provider_name: none} turns it off
+background_music:                 # optional; omitted means no music; synthesized-piano turns it on
   provider_name: synthesized-piano
 has_end_credits: true             # omitted: true; false: no end credits page (references/rendering/end-credits.md)
 audience:

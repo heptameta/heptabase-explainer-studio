@@ -351,7 +351,7 @@ Smaller names with a stable meaning, by domain. Each says which abstraction it b
   spending, and the record of what each beat's audio was made from
   (`episodes/<episode>/narration/narration.yaml`).
 - **background music settings**, **background music provider** (render): The plan's background music block, and what
-  makes the music (today, a piano synthesized on the computer, or none).
+  makes the music (today, none by default, or a piano synthesized on the computer).
 - **scene_kit** (scene file): The library scene files import.
 - **sound** (scene file): A sound effect or audio file a scene plays at a moment.
 - **cover** (render): The picture in the video's first second, also delivered beside it, so a chat app's preview is not

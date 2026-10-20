@@ -290,7 +290,7 @@ function buildProductionSection(plan) {
   const spentText = buildElement('span', {class: 'budget-spent'}, spentBefore,
     buildElement('span', {class: 'amount'}, '$' + pageData.spentUsd.toFixed(2)), spentAfter);
   const musicProviderName = plan.background_music && typeof plan.background_music === 'object'
-    ? plan.background_music.provider_name : 'synthesized-piano';
+    ? plan.background_music.provider_name : 'none';
   const musicSelect = buildElement('select',
     {class: 'hb-select', id: formatFieldId(['background_music', 'provider_name']), disabled: !isEditable},
     pageData.musicProviderNames.map((providerName) => buildElement('option',

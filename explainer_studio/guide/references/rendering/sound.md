@@ -7,7 +7,7 @@ Contents: [What is in the mix](#what-is-in-the-mix) · [self.play_sound](#selfpl
 ## What is in the mix
 
 `render` mixes four things: the narration, the sounds the scene code places, the sound of video clips and scores, and
-the background music under all of them. Levels are set for you:
+the background music under all of them when the plan turns it on. Levels are set for you:
 
 - Narration sits at -20 dBFS RMS (one gain for the whole episode, so the voice keeps its own dynamics).
 - Built-in effects play at fixed levels well under the voice. Audio files and clip sound are levelled to the speech,
@@ -93,7 +93,7 @@ and before the next, followed by a `self.wait(...)` or animations as long as the
 The plan chooses the music; scene code does not.
 
 - `background_music` in `plan.yaml`, for the series or one episode (an episode's block replaces the series' block
-  entirely). Omitted means `{provider_name: synthesized-piano}`; `{provider_name: none}` turns it off.
+  entirely). Omitted means `{provider_name: none}`, no music; `{provider_name: synthesized-piano}` turns it on.
 - `synthesized-piano` is original music made by the program: a slow felt piano over a warm pad, a key of its own per
   episode, a new phrase at the start of every scene. It has no licence to track.
 - The music fades in at the start and out at the end, and ducks under the narration and under ducking sounds on its
