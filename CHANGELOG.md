@@ -15,6 +15,8 @@ in [UPGRADING.md](UPGRADING.md).
   sign-in; each episode delivered later is added to it when its video page opens.
 - The agent writes each episode's cards in `notes.yaml` while it makes the episode, and `deliver` checks them against
   the render (`explainer-studio notes check`); `deliver --skip-notes-check` delivers an episode without cards.
+- When Heptabase answers that this version of Studio is too old for it, the whiteboard asks the user to update
+  Explainer Studio.
 
 ### Changed
 

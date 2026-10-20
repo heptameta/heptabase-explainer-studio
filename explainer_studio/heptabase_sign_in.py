@@ -43,9 +43,13 @@ ACCESS_TOKEN_MARGIN_SECONDS = 5 * 60
 SIGN_IN_ATTEMPT_LIFETIME_SECONDS = 15 * 60
 REQUEST_TIMEOUT_SECONDS = 60
 
-SignInStatus = Literal["pending", "signedIn", "canceled", "failed"]
+# upgradeRequired: Heptabase answered that this Studio is too old for it (UPGRADE_REQUIRED_CODE)
+SignInStatus = Literal["pending", "signedIn", "canceled", "failed", "upgradeRequired"]
 # signed_out: this computer has no sign-in; sign_in_expired: Heptabase no longer accepts the one it has
 SignInRequiredCode = Literal["signed_out", "sign_in_expired"]
+# Reserved for Heptabase to answer, with any HTTP status, when this version of Studio must be updated to keep working:
+# a change it could not make by addition. Heptabase tells which version asks by the User-Agent.
+UPGRADE_REQUIRED_CODE = "upgrade_required"
 
 
 class HeptabaseSignInRequiredError(StudioError):
@@ -57,10 +61,13 @@ class HeptabaseSignInRequiredError(StudioError):
 
 
 class HeptabaseRequestError(StudioError):
-    """Heptabase refused a request; `code` is its error code, when it gave one."""
+    """Heptabase refused a request with HTTP `status_code`; `code` is its error code, when it gave one."""
 
-    def __init__(self, what: str, why: str, code: str | None = None):
-        super().__init__(what, why, "try again; if it keeps failing, tell the Heptabase team")
+    def __init__(self, what: str, status_code: int, code: str | None = None):
+        super().__init__(what, f"HTTP {status_code}" + (f" ({code})" if code else ""),
+                         "update Explainer Studio, then try again" if code == UPGRADE_REQUIRED_CODE
+                         else "try again; if it keeps failing, tell the Heptabase team")
+        self.status_code = status_code
         self.code = code
 
 
@@ -140,6 +147,10 @@ def _fetch_json(method: str, url: str, **request_options: Any) -> tuple[int, Any
         return response.status_code, response.json()
     except ValueError:
         return response.status_code, None
+
+
+def _read_error_code(response_body: Any) -> str | None:
+    return response_body.get("code") if isinstance(response_body, dict) else None
 
 
 def fetch_authorization_server(api_url: str) -> AuthorizationServer:
@@ -277,6 +288,8 @@ def _fetch_account(api_url: str, access_token: str) -> tuple[str, str]:
     """The account an access token is for and its email: the OAuth server's user info (`sub` and `email`). Heptabase
     issues no ID token."""
     status_code, user_info = _fetch_json("GET", f"{api_url}/me", headers={"Authorization": f"Bearer {access_token}"})
+    if _read_error_code(user_info) == UPGRADE_REQUIRED_CODE:
+        raise HeptabaseRequestError("Heptabase did not say which account signed in", status_code, UPGRADE_REQUIRED_CODE)
     if status_code != 200 or not isinstance(user_info, dict) or not isinstance(user_info.get("sub"), str) \
             or not isinstance(user_info.get("email"), str):
         raise StudioError("Heptabase did not say which account signed in", f"/me answered HTTP {status_code}",
@@ -375,14 +388,15 @@ def call_rest_api(api_url: str, path: str, body: dict[str, Any]) -> Any:
         status_code, response_body = _fetch_json(
             "POST", f"{resolve_rest_api_url(api_url)}{path}", json=body,
             headers={"Authorization": f"Bearer {access_token.value}"})
+        code = _read_error_code(response_body)
+        if code == UPGRADE_REQUIRED_CODE:  # whatever the status: a new sign-in would not help
+            raise HeptabaseRequestError(f"Heptabase refused {path}", status_code, code)
         if status_code == 401 and attempt_number == 1:
             forget_access_token(api_url)  # revoked or expired early: refresh once
             continue
         if status_code == 401:
             raise HeptabaseSignInRequiredError("Heptabase refused the access token", "sign_in_expired")
-        code = response_body.get("code") if isinstance(response_body, dict) else None
         if not 200 <= status_code < 300:
-            raise HeptabaseRequestError(f"Heptabase refused {path}",
-                                        f"HTTP {status_code}" + (f" ({code})" if code else ""), code)
+            raise HeptabaseRequestError(f"Heptabase refused {path}", status_code, code)
         return response_body
     raise AssertionError("unreachable")

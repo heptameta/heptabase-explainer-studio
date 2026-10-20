@@ -346,7 +346,7 @@ const whiteboard = {
   isFrameReady: false,
   frameReadyTimerId: null,
   view: 'loading',  // what the whiteboard shows: loading | preview | saved | unreadable | empty
-  unreadableReason: null,  // trashed | deleted | forbidden | signedOut | unauthorized | network | notMeasured
+  unreadableReason: null,  // an embedded page's failed reason (known or not), signedOut or notMeasured
   previewLayout: null,
   shownWhiteboard: null,  // {title, spaceId, contentBounds} of the saved whiteboard on show
   signInStatus: null,  // how the sign-in this page came back from ended, until the next save
@@ -599,7 +599,7 @@ function buildImportRequest(episodes, layout) {
 // Why a save or an import did not go through, in the page's language; the page server's English reason goes in the
 // line's tooltip, for whoever debugs it.
 // The failures that have a reason of their own: those found on this computer (a card Heptabase could not draw among
-// them), and the subscription.
+// them), the subscription, the account's data older than Heptabase needs, and a Studio too old for Heptabase.
 const WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP = {
   not_measured: 'video.whiteboard.reason.notMeasured',
   cards_changed: 'video.whiteboard.reason.cardsChanged',
@@ -607,15 +607,27 @@ const WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP = {
   busy: 'video.whiteboard.reason.busy',
   other_account: 'video.whiteboard.reason.otherAccount',
   subscription_required: 'video.whiteboard.reason.subscriptionRequired',
+  outdated_db_schema_version: 'video.whiteboard.reason.outdatedDbSchemaVersion',
+  upgrade_required: 'video.whiteboard.reason.upgradeRequired',
 };
+// Heptabase's codes this page knows without a reason of their own: its refusals of the whiteboard, which a first save
+// answers with a new whiteboard. Another code may be one a later Heptabase gives and a later Studio knows.
+const KNOWN_HEPTABASE_REFUSAL_CODES = ['whiteboard_trashed', 'whiteboard_deleted', 'forbidden'];
+
+// `heptabaseStatus` is there when Heptabase answered, with its HTTP status.
+function describeWhiteboardFailureReason({status, body: {code, heptabaseStatus}}) {
+  const reasonKey = WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP[code];
+  if (reasonKey) return translate(reasonKey);
+  if (!status || code === 'not_sent') return translate('video.whiteboard.reason.notReached');
+  if (heptabaseStatus && code && !KNOWN_HEPTABASE_REFUSAL_CODES.includes(code)) {
+    return translate('video.whiteboard.reason.unrecognized', {code});
+  }
+  return translate('video.whiteboard.reason.refused', {code: code || `HTTP ${heptabaseStatus || status}`});
+}
 
 function describeWhiteboardFailure(result) {
-  const code = result.body.code;
-  const reasonKey = WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP[code];
-  const reason = reasonKey ? translate(reasonKey)
-    : !result.status || code === 'not_sent' ? translate('video.whiteboard.reason.notReached')
-      : translate('video.whiteboard.reason.refused', {code: code || `HTTP ${result.status}`});
-  return {code, reason, details: [result.body.message, ...(result.body.details || [])].filter(Boolean).join(' · ')};
+  return {code: result.body.code, reason: describeWhiteboardFailureReason(result),
+    details: [result.body.message, ...(result.body.details || [])].filter(Boolean).join(' · ')};
 }
 
 // The preview: the episodes that can go on the whiteboard, laid out from the top left. Nothing leaves the computer.
@@ -850,7 +862,7 @@ async function confirmSaveWhiteboard() {
 }
 
 // The reply to showWhiteboard or refreshWhiteboard. A reason this page does not know, from a later embedded page,
-// reads as one that could not reach Heptabase.
+// shows as an error this Studio does not know.
 function handleWhiteboardReadReply(message) {
   if (message.type === 'whiteboardShown') {
     whiteboard.focusSection = null;
@@ -988,10 +1000,13 @@ function buildUnreadableMessage() {
     return buildWhiteboardMessage(translateWithEpisodes('video.whiteboard.unreadable.unauthorized'),
       [signInAgain, unlink]);
   }
-  return buildWhiteboardMessage(translate('video.whiteboard.unreadable.network'),
-    [buildWhiteboardButton('video.whiteboard.retry', () => {
-      if (whiteboard.isFrameReady) showSavedWhiteboard(); else reloadWhiteboardFrame();
-    })]);
+  const retry = buildWhiteboardButton('video.whiteboard.retry', () => {
+    if (whiteboard.isFrameReady) showSavedWhiteboard(); else reloadWhiteboardFrame();
+  });
+  // the last: a reason a later embedded page gives that this page does not know
+  const textKey = reason === 'upgrade_required' ? 'video.whiteboard.upgradeRequired'
+    : reason === 'network' ? 'video.whiteboard.unreadable.network' : 'video.whiteboard.unreadable.unrecognized';
+  return buildWhiteboardMessage(translate(textKey), [retry]);
 }
 
 // The whiteboard's toolbar, drawn as Heptabase draws the one above a whiteboard. On the left, the map icon and the
@@ -1035,7 +1050,8 @@ function showWhiteboardToolbar() {
     save.disabled = !whiteboard.previewLayout || whiteboard.isSaving;
     actions.push(save);
     const noticeKey = whiteboard.saveFailure ? null : {canceled: 'video.whiteboard.signInCanceled',
-      failed: 'video.whiteboard.signInFailed'}[whiteboard.signInStatus];
+      failed: 'video.whiteboard.signInFailed',
+      upgradeRequired: 'video.whiteboard.upgradeRequired'}[whiteboard.signInStatus];
     if (whiteboard.saveFailure) {
       // no subscription: the save button stays, for after the user subscribes
       const text = whiteboard.saveFailure.code === 'subscription_required'
@@ -1119,6 +1135,10 @@ async function loadWhiteboard() {
     const status = whiteboard.page.signInStatus || 'failed';
     whiteboard.signInStatus = status === 'signedIn' ? null : status;
     whiteboard.isSaveRequested = status === 'signedIn' && !whiteboard.page.savedWhiteboard;
+    // Heptabase answered that this Studio is too old: the save's notice says so; with a saved whiteboard, a toast
+    if (status === 'upgradeRequired' && whiteboard.page.savedWhiteboard) {
+      showToast(translate('video.whiteboard.upgradeRequired'));
+    }
     openWhiteboardMode();
   }
   applyModes();

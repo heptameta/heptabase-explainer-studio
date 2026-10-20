@@ -119,8 +119,14 @@ Unlinking deletes `heptabase-whiteboard.json`. The whiteboard stays in Heptabase
 
 A released Studio talks to whatever Heptabase has deployed, and older releases keep running. Once a release uses
 something below, Heptabase changes it only by addition: new messages, fields, reasons and codes, never one removed or
-renamed. Studio ignores messages and fields it does not know, and reads a failure reason it does not know as Heptabase
-not reached. A Studio change that needs something new from Heptabase is released after Heptabase deploys it.
+renamed. Studio ignores messages and fields it does not know. A failure reason or error code it does not know shows as
+such, with a hint that updating Studio may fix it. A Studio change that needs something new from Heptabase is released
+after Heptabase deploys it.
+
+A change that cannot be made by addition breaks the releases that use what it changes. Heptabase answers those releases,
+which it tells by the User-Agent (`explainer-studio/<version>`), with `upgrade_required`: `{"code": "upgrade_required"}`
+from the REST API, whatever the HTTP status, and `failed` with that reason from the embedded page. Studio then asks the
+user to update it. Heptabase sends neither today; Studio has known both since its first release with the whiteboard.
 
 ### The embedded whiteboard page
 
@@ -140,7 +146,7 @@ the order they came.
 | `focusObject` | `focusTarget`: a `key` given in `showObjects`, or the `objectId` of an object on the saved whiteboard | nothing |
 | `updateAccessToken` | `accessToken` | nothing |
 
-`failed` gives one of `trashed`, `deleted`, `forbidden`, `unauthorized` and `network`.
+`failed` gives one of `trashed`, `deleted`, `forbidden`, `unauthorized` and `network`, or `upgrade_required` (above).
 
 ### The REST API and the OAuth server
 
@@ -149,7 +155,10 @@ the order they came.
 | The OAuth metadata, registration, authorization, token and revocation endpoints | Signing in and out | `access_denied` from the consent page: the sign-in was canceled |
 | `GET /me` | The signed-in account (`sub`) and its `email` | |
 | `POST /v1/getUploadUrl` | A presigned URL to upload one picture | `{status: "file_exists"}`: the picture is there already |
-| `POST /v1/explainerStudio/importWhiteboardObjects` | Creating the whiteboard and adding episodes | `401`: the page server refreshes the access token once, then asks for a sign-in. `403 subscription_required`. `409 whiteboard_trashed`, `409 whiteboard_deleted` and `403 forbidden`: for a first save, a new whiteboard |
+| `POST /v1/explainerStudio/importWhiteboardObjects` | Creating the whiteboard and adding episodes | `401`: the page server refreshes the access token once, then asks for a sign-in. `403 subscription_required`. `409 outdated_db_schema_version`: the account's data is older than the whiteboard needs, which opening the Heptabase app and updating it fixes. `409 whiteboard_trashed`, `409 whiteboard_deleted` and `403 forbidden`: for a first save, a new whiteboard |
+
+`GET /me`, `getUploadUrl` and the import may also answer `upgrade_required` (above). A refusal without a code shows
+with its HTTP status.
 
 Saving needs an active Heptabase subscription (`subscription_required`). The preview needs no account.
 
