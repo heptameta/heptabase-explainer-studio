@@ -27,8 +27,8 @@ The whiteboard is either a preview or saved:
   changed there too. Each episode delivered later is added when one of the series' video pages opens. The toolbar opens
   the whiteboard in Heptabase, brings the episode into view, reads it again, and, in its menu, unlinks it or signs out.
 
-A saved whiteboard that cannot be read says why, with what the user can do: it is in Heptabase's trash (restore it
-there, or unlink), deleted (unlink), not shared with the signed-in account, the computer is signed out or Heptabase no
+A saved whiteboard that cannot be read says why, with what the user can do: it is in Heptabase's trash (open it in
+Heptabase, which offers to restore it, or unlink), deleted (unlink), not shared with the signed-in account, the computer is signed out or Heptabase no
 longer accepts its sign-in (sign in again), or Heptabase was not reached (retry).
 
 ## Who owns what
@@ -96,6 +96,10 @@ again with a fresh token (`updateAccessToken`, then `refreshWhiteboard`) after a
 back to the foreground; a whiteboard that could not be read is tried again from the start, since it may be back from
 the trash. Choosing a chapter, or the episode, sends `focusObject`.
 
+Once the user clicks in the whiteboard, the keyboard focus is in the iframe, so the video page's keydown never sees a
+key. The embedded page passes keys on as `keyPressed`, and the video page runs its shortcut for each, as it would for
+the same key pressed on the page. When the whiteboard closes, the video page takes the focus back.
+
 ### Signing in and out
 
 - The sign-in is per computer and serves every series. It uses Heptabase's OAuth server: its metadata
@@ -142,12 +146,19 @@ the order they came.
 |---|---|---|
 | `measureCards` | `requestId`, `cardWidth`, `cards` (`key`, `content`), `files` (`key`, `blob`) | `cardsMeasured` with the `heights` by key, or `failed` (`reason`) |
 | `showObjects` | `title`, `sections`, `cards`, `connections`, `files`, and optionally `focusTarget` | nothing |
-| `showWhiteboard` | `requestId`, `whiteboardId`, `accessToken`, and optionally `focusTarget` | `whiteboardShown` (`title`, `spaceId`, `contentBounds`) or `failed` (`reason`) |
+| `showWhiteboard` | `requestId`, `whiteboardId`, `accessToken`, and optionally `focusTarget` | `whiteboardShown` (`title`, `spaceId`, `contentBounds`) or `failed` (`reason`, and `spaceId` with `trashed`) |
 | `refreshWhiteboard` | `requestId`, and optionally `focusTarget` | the same as `showWhiteboard` |
 | `focusObject` | `focusTarget`: a `key` given in `showObjects`, or the `objectId` of an object on the saved whiteboard | nothing |
 | `updateAccessToken` | `accessToken` | nothing |
 
 `failed` gives one of `trashed`, `deleted`, `forbidden`, `unauthorized` and `network`, or `upgrade_required` (above).
+With `trashed` it also gives the whiteboard's `spaceId`, so the link to restore it opens the whiteboard itself; without
+one, it opens Heptabase.
+
+The embedded page also sends `keyPressed` (`key`, `code`, as in the browser's `KeyboardEvent`), answering no request:
+a key pressed in the embedded page without Cmd, Ctrl or Alt, not typed into a field, not taken by an input method,
+and not one the page handled. Letters come. Space and the arrow keys may come although the whiteboard uses them
+(to grab the canvas and to move between objects), so the video page leaves them alone while the whiteboard shows.
 
 ### The REST API and the OAuth server
 

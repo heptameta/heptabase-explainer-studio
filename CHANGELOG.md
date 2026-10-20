@@ -26,6 +26,8 @@ in [UPGRADING.md](UPGRADING.md).
 ### Fixed
 
 - The video page's keys work with Zhuyin and other input methods on.
+- The video page's keys work after a click in the whiteboard, and **Restore** on a trashed whiteboard opens it in
+  Heptabase.
 
 ## [1.1.1] - 2026-10-16
 
