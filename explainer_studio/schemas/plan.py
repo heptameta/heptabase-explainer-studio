@@ -23,7 +23,7 @@ BackgroundMusicSettings = Annotated[Union[BACKGROUND_MUSIC_SETTINGS_MODELS],  # 
 LanguageCode = Annotated[str, Field(pattern=r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$")]
 
 DEFAULT_BACKGROUND_MUSIC_SETTINGS = TypeAdapter(BackgroundMusicSettings).validate_python(
-    {"provider_name": "synthesized-piano"})
+    {"provider_name": "none"})
 
 
 class StrictModel(BaseModel):

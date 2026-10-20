@@ -20,6 +20,8 @@ in [UPGRADING.md](UPGRADING.md).
 
 ### Changed
 
+- `render` adds no background music unless the plan asks for it: set `background_music: {provider_name:
+  synthesized-piano}` in `plan.yaml` to keep the piano. A series that never set it renders without music from now on.
 - The video page keeps its mode in its address (`?mode=chapters`), so a reload, Back or a new tab shows the same
   screen; a page opened by `video open` starts with none on.
 

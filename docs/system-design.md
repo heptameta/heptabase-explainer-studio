@@ -107,7 +107,7 @@ voice reads (corner brackets, which the Chinese rewrite removes, for example) ke
 
 `render` runs ManimGL once per scene, in parallel, each process in its own working folder. A scene writes a sidecar
 with its beats' times, its sounds, its automatic check issues and file excerpts. The clips are joined in script order
-behind the cover and before the end credits page (unless the plan turns it off); narration, sounds and the background music are mixed (the music ducked under speech) and
+behind the cover and before the end credits page (unless the plan turns it off); narration, sounds and the background music, when the plan has one, are mixed (the music ducked under speech) and
 normalized; subtitles come from the beats' narration text and the timeline. Everything is written to a temporary
 folder first, so a failed render leaves the previous one in place. The agent cannot watch a video, so preview and
 render write screenshot sheets, and the agent looks at every one before delivering.
