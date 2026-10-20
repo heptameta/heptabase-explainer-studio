@@ -65,10 +65,10 @@ it, so it is written in the pull requests rather than at release time.
 - An entry is one line, two at most, as in [Common Changelog](https://common-changelog.org/) and the changelogs of
   Tailwind CSS and uv: the thing the user meets (a page, a command, a button, a file), what is different, and a short
   example when it says more than an explanation would. The reason, how it works, edge cases and trade-offs go in the
-  pull request. Not "The video page's address holds the modes that are on, as in `.../video/ep02?modes=theater,outline`,
+  pull request. Not "The video page's address holds the mode that is on, as in `.../video/ep02?mode=chapters`,
   so a reload, Back and Forward, and the same address in another tab or browser show the same screen, and switching
-  episodes keeps them. Showing or hiding the whiteboard is a step that Back returns from; ..." but "The video page
-  keeps its modes in its address (`?modes=theater,outline`), so a reload, Back or a new tab shows the same screen."
+  episodes keeps it. Showing or hiding the whiteboard is a step that Back returns from; ..." but "The video page
+  keeps its mode in its address (`?mode=chapters`), so a reload, Back or a new tab shows the same screen."
 - A change that existing series must follow adds a step under `## Unreleased` in `UPGRADING.md`, as its introduction
   says.
 - Only a release pull request adds a version heading ([`releasing`](../releasing/SKILL.md)).
