@@ -140,7 +140,7 @@
   "video.missing.body": "影片已經不在 {path}。請把它放回原位，或請 agent 重新交付這一集。",
   "video.redelivered.title": "這一集有新交付的版本。",
   "video.redelivered.reload": "看新版本",
-  "chapters.chapter": "第 {number} 章",
+  "chapters.chapter": "第 {number} 段",
   "chapters.minutes": "{minutes} 分鐘",
   "chapters.viewOnWhiteboard": "在白板上看這一章",
   "chapters.playFrom": "從 {time} 播",
