@@ -486,7 +486,7 @@ async function loadWhiteboardImages() {
 }
 
 // The cards' heights as Heptabase draws them at the layout's card width: {heights}, or {failure} when the embedded
-// page did not answer (network) or could not draw a card (notMeasured).
+// page did not answer (network), could not draw a card (notMeasured) or answered `failed` (its reason).
 function measureCards(episodes, images) {
   const cards = listEpisodeCards(episodes);
   return new Promise((resolve) => {
@@ -494,6 +494,7 @@ function measureCards(episodes, images) {
     const requestId = postRequestToWhiteboard({type: 'measureCards', cardWidth: WHITEBOARD_LAYOUT.cardWidth,
       cards: cards.map((card) => ({key: card.key, content: card.content})), files: images}, (reply) => {
       clearTimeout(timerId);
+      if (reply.type === 'failed') { resolve({failure: reply.reason}); return; }
       const heights = reply.heights || {};
       resolve(cards.every((card) => heights[card.key] > 0) ? {heights} : {failure: 'notMeasured'});
     });
@@ -737,8 +738,8 @@ async function sendNewEpisodes() {
     const images = await loadWhiteboardImages();
     const measurement = await measureCards(episodes, images);
     if (measurement.failure) {
-      return {isOk: false, status: 0,
-        body: {code: measurement.failure === 'notMeasured' ? 'not_measured' : 'not_sent'}};
+      const code = {notMeasured: 'not_measured', network: 'not_sent'}[measurement.failure] || 'embedded_page_failed';
+      return {isOk: false, status: 0, body: {code, reason: measurement.failure}};
     }
     const bounds = whiteboard.shownWhiteboard.contentBounds;
     const result = await callApi('POST', '/api/series-whiteboard/import', buildImportRequest(episodes,
@@ -765,6 +766,8 @@ async function importNewEpisodes() {
     showUnreadableWhiteboard(result.body.code === 'whiteboard_trashed' ? 'trashed' : 'deleted');
     return;
   }
+  // the embedded page answered `failed` to the measuring: as when it answers a read so
+  if (result.body.code === 'embedded_page_failed') { showUnreadableWhiteboard(result.body.reason); return; }
   if (!result.isOk) {
     whiteboard.importFailure = describeWhiteboardFailure(result);
     showWhiteboardToolbar();
@@ -979,8 +982,12 @@ function buildUnreadableMessage() {
         await showWhiteboardPreview();
       })]);
   }
-  if (!whiteboard.page.savedWhiteboard) {  // the embedded page did not answer before the save
-    return buildWhiteboardMessage(translate('video.whiteboard.unreadable.network'),
+  // network, or the embedded page's `failed`: upgrade_required, or a reason a later embedded page gives that this page
+  // does not know
+  const textKey = reason === 'upgrade_required' ? 'video.whiteboard.upgradeRequired'
+    : reason === 'network' ? 'video.whiteboard.unreadable.network' : 'video.whiteboard.unreadable.unrecognized';
+  if (!whiteboard.page.savedWhiteboard) {  // the embedded page did not answer, or answered `failed`, before the save
+    return buildWhiteboardMessage(translate(textKey),
       [buildWhiteboardButton('video.whiteboard.retry', reloadWhiteboardFrame)]);
   }
   if (reason === 'trashed') {
@@ -1000,13 +1007,9 @@ function buildUnreadableMessage() {
     return buildWhiteboardMessage(translateWithEpisodes('video.whiteboard.unreadable.unauthorized'),
       [signInAgain, unlink]);
   }
-  const retry = buildWhiteboardButton('video.whiteboard.retry', () => {
+  return buildWhiteboardMessage(translate(textKey), [buildWhiteboardButton('video.whiteboard.retry', () => {
     if (whiteboard.isFrameReady) showSavedWhiteboard(); else reloadWhiteboardFrame();
-  });
-  // the last: a reason a later embedded page gives that this page does not know
-  const textKey = reason === 'upgrade_required' ? 'video.whiteboard.upgradeRequired'
-    : reason === 'network' ? 'video.whiteboard.unreadable.network' : 'video.whiteboard.unreadable.unrecognized';
-  return buildWhiteboardMessage(translate(textKey), [retry]);
+  })]);
 }
 
 // The whiteboard's toolbar, drawn as Heptabase draws the one above a whiteboard. On the left, the map icon and the

@@ -123,10 +123,11 @@ renamed. Studio ignores messages and fields it does not know. A failure reason o
 such, with a hint that updating Studio may fix it. A Studio change that needs something new from Heptabase is released
 after Heptabase deploys it.
 
-A change that cannot be made by addition breaks the releases that use what it changes. Heptabase answers those releases,
-which it tells by the User-Agent (`explainer-studio/<version>`), with `upgrade_required`: `{"code": "upgrade_required"}`
-from the REST API, whatever the HTTP status, and `failed` with that reason from the embedded page. Studio then asks the
-user to update it. Heptabase sends neither today; Studio has known both since its first release with the whiteboard.
+A change that cannot be made by addition breaks the releases that use what it changes, and Heptabase answers them with
+`upgrade_required`. The REST API answers `{"code": "upgrade_required"}`, whatever the HTTP status, to the releases it
+tells by the User-Agent (`explainer-studio/<version>`). The embedded page, which does not know the release, answers
+`failed` with that reason to a request it can no longer serve. Studio then asks the user to update it. Studio has known
+both since its first release with the whiteboard.
 
 ### The embedded whiteboard page
 
@@ -139,7 +140,7 @@ the order they came.
 
 | The video page sends | With | The embedded page answers |
 |---|---|---|
-| `measureCards` | `requestId`, `cardWidth`, `cards` (`key`, `content`), `files` (`key`, `blob`) | `cardsMeasured` with the `heights` by key |
+| `measureCards` | `requestId`, `cardWidth`, `cards` (`key`, `content`), `files` (`key`, `blob`) | `cardsMeasured` with the `heights` by key, or `failed` (`reason`) |
 | `showObjects` | `title`, `sections`, `cards`, `connections`, `files`, and optionally `focusTarget` | nothing |
 | `showWhiteboard` | `requestId`, `whiteboardId`, `accessToken`, and optionally `focusTarget` | `whiteboardShown` (`title`, `spaceId`, `contentBounds`) or `failed` (`reason`) |
 | `refreshWhiteboard` | `requestId`, and optionally `focusTarget` | the same as `showWhiteboard` |
