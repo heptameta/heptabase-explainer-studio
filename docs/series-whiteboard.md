@@ -123,8 +123,15 @@ Unlinking deletes `heptabase-whiteboard.json`. The whiteboard stays in Heptabase
 
 A released Studio talks to whatever Heptabase has deployed, and older releases keep running. Once a release uses
 something below, Heptabase changes it only by addition: new messages, fields, reasons and codes, never one removed or
-renamed. Studio ignores messages and fields it does not know, and reads a failure reason it does not know as Heptabase
-not reached. A Studio change that needs something new from Heptabase is released after Heptabase deploys it.
+renamed. Studio ignores messages and fields it does not know. A failure reason or error code it does not know shows as
+such, with a hint that updating Studio may fix it. A Studio change that needs something new from Heptabase is released
+after Heptabase deploys it.
+
+A change that cannot be made by addition breaks the releases that use what it changes, and Heptabase answers them with
+`upgrade_required`. The REST API answers `{"code": "upgrade_required"}`, whatever the HTTP status, to the releases it
+tells by the User-Agent (`explainer-studio/<version>`). The embedded page, which does not know the release, answers
+`failed` with that reason to a request it can no longer serve. Studio then asks the user to update it. Studio has known
+both since its first release with the whiteboard.
 
 ### The embedded whiteboard page
 
@@ -137,15 +144,16 @@ the order they came.
 
 | The video page sends | With | The embedded page answers |
 |---|---|---|
-| `measureCards` | `requestId`, `cardWidth`, `cards` (`key`, `content`), `files` (`key`, `blob`) | `cardsMeasured` with the `heights` by key |
+| `measureCards` | `requestId`, `cardWidth`, `cards` (`key`, `content`), `files` (`key`, `blob`) | `cardsMeasured` with the `heights` by key, or `failed` (`reason`) |
 | `showObjects` | `title`, `sections`, `cards`, `connections`, `files`, and optionally `focusTarget` | nothing |
 | `showWhiteboard` | `requestId`, `whiteboardId`, `accessToken`, and optionally `focusTarget` | `whiteboardShown` (`title`, `spaceId`, `contentBounds`) or `failed` (`reason`, and `spaceId` with `trashed`) |
 | `refreshWhiteboard` | `requestId`, and optionally `focusTarget` | the same as `showWhiteboard` |
 | `focusObject` | `focusTarget`: a `key` given in `showObjects`, or the `objectId` of an object on the saved whiteboard | nothing |
 | `updateAccessToken` | `accessToken` | nothing |
 
-`failed` gives one of `trashed`, `deleted`, `forbidden`, `unauthorized` and `network`. With `trashed` it also gives the
-whiteboard's `spaceId`, so the link to restore it opens the whiteboard itself; without one, it opens Heptabase.
+`failed` gives one of `trashed`, `deleted`, `forbidden`, `unauthorized` and `network`, or `upgrade_required` (above).
+With `trashed` it also gives the whiteboard's `spaceId`, so the link to restore it opens the whiteboard itself; without
+one, it opens Heptabase.
 
 The embedded page also sends `keyPressed` (`key`, `code`, as in the browser's `KeyboardEvent`), answering no request:
 a key pressed in the embedded page without Cmd, Ctrl or Alt, not typed into a field, not taken by an input method,
@@ -159,7 +167,10 @@ and not one the page handled. Letters come. Space and the arrow keys may come al
 | The OAuth metadata, registration, authorization, token and revocation endpoints | Signing in and out | `access_denied` from the consent page: the sign-in was canceled |
 | `GET /me` | The signed-in account (`sub`) and its `email` | |
 | `POST /v1/getUploadUrl` | A presigned URL to upload one picture | `{status: "file_exists"}`: the picture is there already |
-| `POST /v1/explainerStudio/importWhiteboardObjects` | Creating the whiteboard and adding episodes | `401`: the page server refreshes the access token once, then asks for a sign-in. `403 subscription_required`. `409 whiteboard_trashed`, `409 whiteboard_deleted` and `403 forbidden`: for a first save, a new whiteboard |
+| `POST /v1/explainerStudio/importWhiteboardObjects` | Creating the whiteboard and adding episodes | `401`: the page server refreshes the access token once, then asks for a sign-in. `403 subscription_required`. `409 outdated_db_schema_version`: the account's data is older than the whiteboard needs, which opening the Heptabase app and updating it fixes. `409 whiteboard_trashed`, `409 whiteboard_deleted` and `403 forbidden`: for a first save, a new whiteboard |
+
+`GET /me`, `getUploadUrl` and the import may also answer `upgrade_required` (above). A refusal without a code shows
+with its HTTP status.
 
 Saving needs an active Heptabase subscription (`subscription_required`). The preview needs no account.
 

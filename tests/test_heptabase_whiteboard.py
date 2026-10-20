@@ -45,7 +45,7 @@ class FakeHeptabase:
             raise StudioError("Heptabase could not be reached", "ReadTimeout")
         code = self.refusal_code_by_whiteboard_id_map.get(body["whiteboard"]["id"])
         if code:
-            raise heptabase_sign_in.HeptabaseRequestError("Heptabase refused it", f"HTTP 409 ({code})", code)
+            raise heptabase_sign_in.HeptabaseRequestError("Heptabase refused it", 409, code)
         return {}
 
 

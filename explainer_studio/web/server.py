@@ -272,6 +272,9 @@ class PageRequestHandler(BaseHTTPRequestHandler):
             heptabase_sign_in.finish_sign_in(attempt, code)
         except StudioError as error:
             print(f"Heptabase sign-in did not finish: {error.what} ({error.why})", file=sys.stderr)
+            if isinstance(error, heptabase_sign_in.HeptabaseRequestError) \
+                    and error.code == heptabase_sign_in.UPGRADE_REQUIRED_CODE:
+                return "upgradeRequired"
             return "failed"
         return "signedIn"
 
@@ -295,14 +298,16 @@ class PageRequestHandler(BaseHTTPRequestHandler):
 
     def _send_heptabase_failure(self, error: StudioError) -> None:
         """A request to Heptabase that did not go through: 401 when a sign-in is needed, with whether this computer is
-        signed out or Heptabase no longer accepts its sign-in, 409 with the reason when Studio did not send it, else 502
-        with Heptabase's error code when it gave one."""
+        signed out or Heptabase no longer accepts its sign-in, 409 with the reason when Studio did not send it, 502 with
+        Heptabase's HTTP status and its error code (null when it gave none) when it refused, else 502 `not_sent`."""
         if isinstance(error, heptabase_sign_in.HeptabaseSignInRequiredError):
             return self._send_json(401, {"code": error.code, "message": error.why})
         if isinstance(error, heptabase_whiteboard.WhiteboardImportRefusedError):
             return self._send_json(409, {"code": error.code, "message": error.what, "details": [error.why]})
-        code = error.code if isinstance(error, heptabase_sign_in.HeptabaseRequestError) else None
-        self._send_json(502, {"code": code or "not_sent", "message": error.what, "details": [error.why]})
+        if isinstance(error, heptabase_sign_in.HeptabaseRequestError):
+            return self._send_json(502, {"code": error.code, "heptabaseStatus": error.status_code,
+                                         "message": error.what, "details": [error.why]})
+        self._send_json(502, {"code": "not_sent", "message": error.what, "details": [error.why]})
 
     def _route_request(self, method: str, route: list[str], query: dict[str, list[str]]) -> None:
         series = self.server.series

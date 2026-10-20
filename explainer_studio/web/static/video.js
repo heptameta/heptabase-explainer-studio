@@ -348,7 +348,7 @@ const whiteboard = {
   isFrameReady: false,
   frameReadyTimerId: null,
   view: 'loading',  // what the whiteboard shows: loading | preview | saved | unreadable | empty
-  unreadableReason: null,  // trashed | deleted | forbidden | signedOut | unauthorized | network | notMeasured
+  unreadableReason: null,  // an embedded page's failed reason (known or not), signedOut or notMeasured
   unreadableSpaceId: null,  // trashed: the saved whiteboard's space, where Heptabase offers to restore it
   previewLayout: null,
   shownWhiteboard: null,  // {title, spaceId, contentBounds} of the saved whiteboard on show
@@ -489,7 +489,7 @@ async function loadWhiteboardImages() {
 }
 
 // The cards' heights as Heptabase draws them at the layout's card width: {heights}, or {failure} when the embedded
-// page did not answer (network) or could not draw a card (notMeasured).
+// page did not answer (network), could not draw a card (notMeasured) or answered `failed` (its reason).
 function measureCards(episodes, images) {
   const cards = listEpisodeCards(episodes);
   return new Promise((resolve) => {
@@ -497,6 +497,7 @@ function measureCards(episodes, images) {
     const requestId = postRequestToWhiteboard({type: 'measureCards', cardWidth: WHITEBOARD_LAYOUT.cardWidth,
       cards: cards.map((card) => ({key: card.key, content: card.content})), files: images}, (reply) => {
       clearTimeout(timerId);
+      if (reply.type === 'failed') { resolve({failure: reply.reason}); return; }
       const heights = reply.heights || {};
       resolve(cards.every((card) => heights[card.key] > 0) ? {heights} : {failure: 'notMeasured'});
     });
@@ -602,7 +603,7 @@ function buildImportRequest(episodes, layout) {
 // Why a save or an import did not go through, in the page's language; the page server's English reason goes in the
 // line's tooltip, for whoever debugs it.
 // The failures that have a reason of their own: those found on this computer (a card Heptabase could not draw among
-// them), and the subscription.
+// them), the subscription, the account's data older than Heptabase needs, and a Studio too old for Heptabase.
 const WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP = {
   not_measured: 'video.whiteboard.reason.notMeasured',
   cards_changed: 'video.whiteboard.reason.cardsChanged',
@@ -610,15 +611,27 @@ const WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP = {
   busy: 'video.whiteboard.reason.busy',
   other_account: 'video.whiteboard.reason.otherAccount',
   subscription_required: 'video.whiteboard.reason.subscriptionRequired',
+  outdated_db_schema_version: 'video.whiteboard.reason.outdatedDbSchemaVersion',
+  upgrade_required: 'video.whiteboard.reason.upgradeRequired',
 };
+// Heptabase's codes this page knows without a reason of their own: its refusals of the whiteboard, which a first save
+// answers with a new whiteboard. Another code may be one a later Heptabase gives and a later Studio knows.
+const KNOWN_HEPTABASE_REFUSAL_CODES = ['whiteboard_trashed', 'whiteboard_deleted', 'forbidden'];
+
+// `heptabaseStatus` is there when Heptabase answered, with its HTTP status.
+function describeWhiteboardFailureReason({status, body: {code, heptabaseStatus}}) {
+  const reasonKey = WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP[code];
+  if (reasonKey) return translate(reasonKey);
+  if (!status || code === 'not_sent') return translate('video.whiteboard.reason.notReached');
+  if (heptabaseStatus && code && !KNOWN_HEPTABASE_REFUSAL_CODES.includes(code)) {
+    return translate('video.whiteboard.reason.unrecognized', {code});
+  }
+  return translate('video.whiteboard.reason.refused', {code: code || `HTTP ${heptabaseStatus || status}`});
+}
 
 function describeWhiteboardFailure(result) {
-  const code = result.body.code;
-  const reasonKey = WHITEBOARD_FAILURE_REASON_KEY_BY_CODE_MAP[code];
-  const reason = reasonKey ? translate(reasonKey)
-    : !result.status || code === 'not_sent' ? translate('video.whiteboard.reason.notReached')
-      : translate('video.whiteboard.reason.refused', {code: code || `HTTP ${result.status}`});
-  return {code, reason, details: [result.body.message, ...(result.body.details || [])].filter(Boolean).join(' · ')};
+  return {code: result.body.code, reason: describeWhiteboardFailureReason(result),
+    details: [result.body.message, ...(result.body.details || [])].filter(Boolean).join(' · ')};
 }
 
 // The preview: the episodes that can go on the whiteboard, laid out from the top left. Nothing leaves the computer.
@@ -728,8 +741,8 @@ async function sendNewEpisodes() {
     const images = await loadWhiteboardImages();
     const measurement = await measureCards(episodes, images);
     if (measurement.failure) {
-      return {isOk: false, status: 0,
-        body: {code: measurement.failure === 'notMeasured' ? 'not_measured' : 'not_sent'}};
+      const code = {notMeasured: 'not_measured', network: 'not_sent'}[measurement.failure] || 'embedded_page_failed';
+      return {isOk: false, status: 0, body: {code, reason: measurement.failure}};
     }
     const bounds = whiteboard.shownWhiteboard.contentBounds;
     const result = await callApi('POST', '/api/series-whiteboard/import', buildImportRequest(episodes,
@@ -758,6 +771,8 @@ async function importNewEpisodes() {
       whiteboard.shownWhiteboard.spaceId);
     return;
   }
+  // the embedded page answered `failed` to the measuring: as when it answers a read so
+  if (result.body.code === 'embedded_page_failed') { showUnreadableWhiteboard(result.body.reason); return; }
   if (!result.isOk) {
     whiteboard.importFailure = describeWhiteboardFailure(result);
     showWhiteboardToolbar();
@@ -856,7 +871,7 @@ async function confirmSaveWhiteboard() {
 }
 
 // The reply to showWhiteboard or refreshWhiteboard. A reason this page does not know, from a later embedded page,
-// reads as one that could not reach Heptabase.
+// shows as an error this Studio does not know.
 function handleWhiteboardReadReply(message) {
   if (message.type === 'whiteboardShown') {
     whiteboard.focusSection = null;
@@ -986,8 +1001,12 @@ function buildUnreadableMessage() {
         await showWhiteboardPreview();
       })]);
   }
-  if (!whiteboard.page.savedWhiteboard) {  // the embedded page did not answer before the save
-    return buildWhiteboardMessage(translate('video.whiteboard.unreadable.network'),
+  // network, or the embedded page's `failed`: upgrade_required, or a reason a later embedded page gives that this page
+  // does not know
+  const textKey = reason === 'upgrade_required' ? 'video.whiteboard.upgradeRequired'
+    : reason === 'network' ? 'video.whiteboard.unreadable.network' : 'video.whiteboard.unreadable.unrecognized';
+  if (!whiteboard.page.savedWhiteboard) {  // the embedded page did not answer, or answered `failed`, before the save
+    return buildWhiteboardMessage(translate(textKey),
       [buildWhiteboardButton('video.whiteboard.retry', reloadWhiteboardFrame)]);
   }
   if (reason === 'trashed') {
@@ -1010,10 +1029,9 @@ function buildUnreadableMessage() {
     return buildWhiteboardMessage(translateWithEpisodes('video.whiteboard.unreadable.unauthorized'),
       [signInAgain, unlink]);
   }
-  return buildWhiteboardMessage(translate('video.whiteboard.unreadable.network'),
-    [buildWhiteboardButton('video.whiteboard.retry', () => {
-      if (whiteboard.isFrameReady) showSavedWhiteboard(); else reloadWhiteboardFrame();
-    })]);
+  return buildWhiteboardMessage(translate(textKey), [buildWhiteboardButton('video.whiteboard.retry', () => {
+    if (whiteboard.isFrameReady) showSavedWhiteboard(); else reloadWhiteboardFrame();
+  })]);
 }
 
 // The whiteboard's toolbar, drawn as Heptabase draws the one above a whiteboard. On the left, the map icon and the
@@ -1056,7 +1074,8 @@ function showWhiteboardToolbar() {
     save.disabled = !whiteboard.previewLayout || whiteboard.isSaving;
     actions.push(save);
     const noticeKey = whiteboard.saveFailure ? null : {canceled: 'video.whiteboard.signInCanceled',
-      failed: 'video.whiteboard.signInFailed'}[whiteboard.signInStatus];
+      failed: 'video.whiteboard.signInFailed',
+      upgradeRequired: 'video.whiteboard.upgradeRequired'}[whiteboard.signInStatus];
     if (whiteboard.saveFailure) {
       // no subscription: the save button stays, for after the user subscribes
       const text = whiteboard.saveFailure.code === 'subscription_required'
@@ -1140,6 +1159,10 @@ async function loadWhiteboard() {
     const status = whiteboard.page.signInStatus || 'failed';
     whiteboard.signInStatus = status === 'signedIn' ? null : status;
     whiteboard.isSaveRequested = status === 'signedIn' && !whiteboard.page.savedWhiteboard;
+    // Heptabase answered that this Studio is too old: the save's notice says so; with a saved whiteboard, a toast
+    if (status === 'upgradeRequired' && whiteboard.page.savedWhiteboard) {
+      showToast(translate('video.whiteboard.upgradeRequired'));
+    }
     openWhiteboardMode();
   }
   applyModes();
