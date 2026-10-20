@@ -1,8 +1,8 @@
 // The video page: the latest delivery of one episode, its comments, the survey (a rating, and the watch depth in dev
 // mode) and sharing with the team.
 // Keys: Space plays or pauses, the arrows move 5 s, M adds a comment (the video pauses; Enter saves and plays on,
-// Esc cancels), C turns subtitles on or off, and T, O and W turn theater mode, the outline and the whiteboard on or
-// off; a letter key works whatever the keyboard layout or input method types with it (resolveShortcutKey). The video
+// Esc cancels), C turns subtitles on or off, and T, N and W turn theater mode, the chapters view and the whiteboard on
+// or off; a letter key works whatever the keyboard layout or input method types with it (resolveShortcutKey). The video
 // element is made once; everything else is shown again from the server's JSON whenever feedback.json or the delivery
 // changes, so the agent's changes show up without a reload.
 'use strict';
@@ -34,9 +34,6 @@ function saveIsOn(name, isOn) {
 }
 
 let isShowingSubtitles = loadIsOn('subtitles');
-let isTheaterModeOn = false;
-let isOutlineModeOn = false;
-let isWhiteboardModeOn = false;
 const nodes = {};
 
 async function fetchPageJson() {
@@ -68,99 +65,95 @@ function toggleSubtitles() {
   applySubtitles();
 }
 
-// Theater mode, the outline and the whiteboard ----------------------------------------------------------------------
-// Three buttons in the toolbar:
+// Theater mode, the chapters view and the whiteboard ----------------------------------------------------------------
+// Three modes in the toolbar, one at a time: turning one on turns the other off.
 // - theater mode: the video as large as the window allows, on a black band across the page, with the toolbar still
 //   in view under it;
-// - the outline: this episode's chapters (notes.yaml), each with its scenes (a key frame, a title, where it starts and
-//   its core idea), to jump to. It sits beside the video in a block as tall as it, or under the toolbar in theater
-//   mode and on a narrow window, so it never makes the video smaller;
+// - the chapters view: the episode to read from top to bottom (notes.yaml), each chapter a large frame beside its
+//   scenes, each scene a key frame, a title, where it starts and its core idea. Choosing a scene plays it in its
+//   chapter's frame: the page's one video element moves there, follows the video into the next chapter as it plays on,
+//   and goes back under the title when the view closes;
 // - the whiteboard: the series' whiteboard (below) in place of the video, filling the page under the toolbar; with no
-//   video in view, the comment and subtitle buttons are off and the rest of the page is hidden. Theater mode and the
-//   outline come back as they were when it closes, and either of their buttons closes it.
-// The modes that are on are in the page's address (`?modes=theater,outline`), so a reload, Back and Forward, and the
-// same address in another tab or browser show the same screen, and switching episodes keeps them; a page opened
-// without them (from the plan page, or by `video open`) shows the video with none on. Showing or hiding the whiteboard
-// changes what the page shows, as going to another page does, so it adds a history entry that Back returns from;
-// theater mode and the outline only change the layout and update the current entry. Subtitles are a preference for
-// every video, remembered in the browser.
-const MODES_QUERY_NAME = 'modes';
-const MODE_NAMES = ['theater', 'outline', 'whiteboard'];  // in the toolbar's order, which the address keeps
+//   video in view, the comment and subtitle buttons are off and the rest of the page is hidden.
+// The mode on is in the page's address (`?mode=chapters`), so a reload, Back and Forward, and the same address in
+// another tab or browser show the same screen, and switching episodes keeps it; a page opened without it (from the plan
+// page, or by `video open`) shows the video with none on. Showing or hiding the whiteboard changes what the page shows,
+// as going to another page does, so it adds a history entry that Back returns from; theater mode and the chapters view
+// only change the layout and update the current entry. Subtitles are a preference for every video, remembered in the
+// browser.
+const MODE_QUERY_NAME = 'mode';
+const MODE_NAMES = ['theater', 'chapters', 'whiteboard'];  // in the toolbar's order
+let modeName = null;  // the mode on, or null; it shows once it is available (resolveShownModeName)
 
-// The modes the page's address turns on; a name it does not know is ignored.
-function setModesFromUrl() {
-  const modeNames = (new URLSearchParams(window.location.search).get(MODES_QUERY_NAME) || '').split(',');
-  isTheaterModeOn = modeNames.includes('theater');
-  isOutlineModeOn = modeNames.includes('outline');
-  isWhiteboardModeOn = modeNames.includes('whiteboard');
+// The mode the page's address turns on; a name it does not know is ignored.
+function setModeFromUrl() {
+  const urlModeName = new URLSearchParams(window.location.search).get(MODE_QUERY_NAME);
+  modeName = MODE_NAMES.includes(urlModeName) ? urlModeName : null;
 }
 
-// `?modes=...` with the modes on now, or '' with none; the commas stay as they are, readable.
-function buildModesQuery() {
-  const isOnByModeNameMap = {theater: isTheaterModeOn, outline: isOutlineModeOn, whiteboard: isWhiteboardModeOn};
-  const modeNames = MODE_NAMES.filter((name) => isOnByModeNameMap[name]);
-  return modeNames.length ? `?${MODES_QUERY_NAME}=${modeNames.join(',')}` : '';
+// `?mode=...` with the mode on now, or '' with none.
+function buildModeQuery() {
+  return modeName ? `?${MODE_QUERY_NAME}=${modeName}` : '';
 }
 
-// The page's address with the modes on now, and the rest of its query but the sign-in's id, which is read once.
+// The page's address with the mode on now, and the rest of its query but the sign-in's id, which is read once.
 function buildPageUrl() {
   const pageUrl = new URL(window.location.href);
-  pageUrl.searchParams.delete(MODES_QUERY_NAME);
+  pageUrl.searchParams.delete(MODE_QUERY_NAME);
   pageUrl.searchParams.delete(SIGN_IN_QUERY_NAME);
-  const queryParts = [pageUrl.searchParams.toString(), buildModesQuery().slice(1)].filter(Boolean);
-  return pageUrl.pathname + (queryParts.length ? `?${queryParts.join('&')}` : '') + pageUrl.hash;
+  if (modeName) pageUrl.searchParams.set(MODE_QUERY_NAME, modeName);
+  return pageUrl.pathname + pageUrl.search + pageUrl.hash;
 }
 
-// Puts the modes on now in the page's address: in a new history entry when the whiteboard showed or hid
+// Puts the mode on now in the page's address: in a new history entry when the whiteboard showed or hid
 // (`wasWhiteboardShown` is whether it showed before the change), else in the current one.
-function recordModesInUrl(wasWhiteboardShown) {
+function recordModeInUrl(wasWhiteboardShown) {
   const nextUrl = buildPageUrl();
   if (nextUrl === window.location.pathname + window.location.search + window.location.hash) return;
   if (checkIsWhiteboardModeShown() !== wasWhiteboardShown) history.pushState(null, '', nextUrl);
   else history.replaceState(history.state, '', nextUrl);
 }
 
-setModesFromUrl();
+setModeFromUrl();
 
-// Back and Forward between this page's history entries: the modes in their addresses.
+// Back and Forward between this page's history entries: the mode in their addresses.
 window.addEventListener('popstate', () => {
-  setModesFromUrl();
-  applyModes();
+  setModeFromUrl();
+  applyMode();
 });
 
-function checkIsOutlineAvailable() {
-  return Boolean(video && pageData.chapters);
+// Whether a mode can show: every mode needs the video, the chapters view chapters that fit it, and the whiteboard what
+// the page server holds for it.
+function checkIsModeAvailable(name) {
+  if (!video) return false;
+  if (name === 'chapters') return Boolean(pageData.chapters);
+  if (name === 'whiteboard') return Boolean(whiteboard.page);
+  return true;
 }
 
-function checkIsWhiteboardAvailable() {
-  return Boolean(video && whiteboard.page);
+// The mode the page shows: the one on, once it is available; null for none.
+function resolveShownModeName() {
+  return modeName && checkIsModeAvailable(modeName) ? modeName : null;
+}
+
+function checkIsChaptersModeShown() {
+  return resolveShownModeName() === 'chapters';
 }
 
 function checkIsWhiteboardModeShown() {
-  return isWhiteboardModeOn && checkIsWhiteboardAvailable();
+  return resolveShownModeName() === 'whiteboard';
 }
 
-function checkIsOutlineModeShown() {
-  return isOutlineModeOn && checkIsOutlineAvailable() && !checkIsWhiteboardModeShown();
-}
-
-function applyModes() {
-  const isWhiteboardShown = checkIsWhiteboardModeShown();
-  const isTheaterShown = Boolean(video) && isTheaterModeOn && !isWhiteboardShown;
-  const isOutlineAvailable = checkIsOutlineAvailable();
-  const isOutlineShown = checkIsOutlineModeShown();
-  document.body.classList.toggle('theater-mode', isTheaterShown);
-  document.body.classList.toggle('outline-mode', isOutlineShown);
-  document.body.classList.toggle('whiteboard-mode', isWhiteboardShown);
-  document.body.classList.toggle('outline-under-whiteboard',
-    isOutlineAvailable && isOutlineModeOn && isWhiteboardShown);
-  for (const [button, isShown, isAvailable] of [[nodes.theaterMode, isTheaterShown, true],
-    [nodes.outlineMode, isOutlineShown, isOutlineAvailable],
-    [nodes.whiteboardMode, isWhiteboardShown, checkIsWhiteboardAvailable()]]) {
+function applyMode() {
+  const shownModeName = resolveShownModeName();
+  for (const name of MODE_NAMES) document.body.classList.toggle(`${name}-mode`, shownModeName === name);
+  for (const [name, button] of [['theater', nodes.theaterMode], ['chapters', nodes.chaptersMode],
+    ['whiteboard', nodes.whiteboardMode]]) {
     if (!button) continue;
-    button.setAttribute('aria-pressed', String(isShown));
-    button.hidden = !isAvailable;
+    button.setAttribute('aria-pressed', String(shownModeName === name));
+    button.hidden = !checkIsModeAvailable(name);
   }
+  const isWhiteboardShown = shownModeName === 'whiteboard';
   if (isWhiteboardShown && video && !video.paused) video.pause();
   for (const button of [nodes.addComment, nodes.subtitles]) if (button) button.disabled = isWhiteboardShown;
   // the whiteboard is the whole page and does not scroll, and a reload opens on it, not where the page was
@@ -168,45 +161,31 @@ function applyModes() {
   if (isWhiteboardShown) { window.scrollTo(0, 0); mountWhiteboard(); }
   // a hidden whiteboard keeps no keyboard focus, which would take the keys the video's shortcuts need
   else if (whiteboard.frame && document.activeElement === whiteboard.frame) whiteboard.frame.blur();
-  placeOutline();
-  showOutlineProgress();
+  placeVideo();
+  showChapterProgress();
 }
 
-function toggleTheaterMode() {
-  if (!video) return;
+// Turns a mode on, or off when it shows, and brings into view what changed under the toolbar: the video in theater
+// mode, the chapter the video is in when the chapters view opens (the page's top before the video has started), and the
+// video when the chapters view closes.
+function toggleMode(name) {
+  if (!checkIsModeAvailable(name)) return;
   const wasWhiteboardShown = checkIsWhiteboardModeShown();
-  isTheaterModeOn = wasWhiteboardShown || !isTheaterModeOn;
-  isWhiteboardModeOn = false;
-  recordModesInUrl(wasWhiteboardShown);
-  applyModes();
-  if (isTheaterModeOn) video.scrollIntoView({block: 'start'});
-}
-
-function toggleOutlineMode() {
-  if (!checkIsOutlineAvailable()) return;
-  const wasWhiteboardShown = checkIsWhiteboardModeShown();
-  isOutlineModeOn = wasWhiteboardShown || !isOutlineModeOn;
-  isWhiteboardModeOn = false;
-  recordModesInUrl(wasWhiteboardShown);
-  applyModes();
-}
-
-function toggleWhiteboardMode() {
-  if (!checkIsWhiteboardAvailable()) return;
-  const wasWhiteboardShown = checkIsWhiteboardModeShown();
-  isWhiteboardModeOn = !wasWhiteboardShown;
-  recordModesInUrl(wasWhiteboardShown);
-  applyModes();
+  const wasChaptersShown = checkIsChaptersModeShown();
+  modeName = resolveShownModeName() === name ? null : name;
+  recordModeInUrl(wasWhiteboardShown);
+  applyMode();
+  if (modeName === 'theater') video.scrollIntoView({block: 'start'});
+  else if (modeName === 'chapters' && !checkIsVideoHome()) video.closest('.chapter').scrollIntoView({block: 'start'});
+  else if (modeName === 'chapters') window.scrollTo(0, 0);
+  else if (wasChaptersShown && !modeName) video.scrollIntoView({block: 'nearest'});
 }
 
 function openWhiteboardMode() {
-  if (!checkIsWhiteboardModeShown()) toggleWhiteboardMode();
+  if (!checkIsWhiteboardModeShown()) toggleMode('whiteboard');
 }
 
-let outlineJson = null;
-let currentOutlineRow = null;  // the row of the scene the video is in
-// Beside the video when the window has room for both, unless theater mode keeps the width for the video.
-const WIDE_WINDOW_QUERY = window.matchMedia('(min-width: 960px)');
+let chaptersJson = null;
 
 function getMediaUrl(name) {
   return `${BOOT.baseUrl}/media/${EPISODE_ID}/${name}`;
@@ -216,65 +195,98 @@ function getFrameUrl(beatId) {
   return getMediaUrl(`frames/${encodeURIComponent(beatId)}.jpg`);
 }
 
-function checkIsOutlineBesideVideo() {
-  return Boolean(nodes.outline) && nodes.outline.parentNode === nodes.videoHome;
+function checkIsVideoHome() {
+  return nodes.videoHome.contains(video);
 }
 
-function placeOutline() {
-  if (!nodes.outline || !video) return;
-  if (!isTheaterModeOn && WIDE_WINDOW_QUERY.matches) {
-    if (!checkIsOutlineBesideVideo()) nodes.videoHome.append(nodes.outline);
-  } else if (nodes.outline.previousElementSibling !== nodes.composer) {
-    nodes.composer.after(nodes.outline);
+// Whether the video has started, so that the chapters view plays it in a chapter rather than showing key frames.
+function checkHasVideoStarted() {
+  return video.currentTime > 0 || !video.paused || video.played.length > 0;
+}
+
+// The chapter a moment of the video is in, by its index; the last one after the last scene.
+function findChapterIndex(seconds) {
+  const chapterIndex = pageData.chapters.findIndex((chapter) => seconds < chapter.scenes.at(-1).endSeconds);
+  return chapterIndex === -1 ? pageData.chapters.length - 1 : chapterIndex;
+}
+
+// Puts the page's one video element where it plays: in the chapters view, once it has started, in the frame of the
+// chapter it is in, with the composer under it; otherwise under the title, with the composer under the toolbar. It
+// stays where it is in full screen and picture in picture, which moving it would end.
+function placeVideo() {
+  if (!video || document.fullscreenElement === video || document.pictureInPictureElement === video) return;
+  const chapterSection = checkIsChaptersModeShown() && checkHasVideoStarted()
+    ? nodes.chapterSections[findChapterIndex(video.currentTime)] : null;
+  const videoParent = chapterSection ? chapterSection.frame : nodes.videoHome;
+  if (video.parentNode !== videoParent) {
+    videoParent.replaceChildren(video);
+    for (const {frame, cover} of nodes.chapterSections || []) if (!frame.firstChild) frame.append(cover);
   }
+  const composerPrevious = chapterSection ? chapterSection.frame : nodes.toolbar;
+  if (nodes.composer.previousElementSibling !== composerPrevious) composerPrevious.after(nodes.composer);
 }
 
-WIDE_WINDOW_QUERY.addEventListener('change', placeOutline);
+// Whether a part of the page is on the screen, under the page's header.
+function checkIsInView(node) {
+  const rect = node.getBoundingClientRect();
+  const middle = rect.top + rect.height / 2;
+  return rect.height > 0 && middle > 48 && middle < window.innerHeight;
+}
 
-// Plays from a scene's start. Under the toolbar, the outline brings the video back into view first.
+// As the video plays into another chapter, or the keys move it there, it moves to that chapter's frame, and a viewer
+// who was watching it is taken down the page with it. Dragged along its own timeline, it moves once it plays again
+// (Chrome pauses it for the drag), since moving it would end the drag. Out of the chapters view, a video kept in a
+// frame by full screen goes back.
+function followVideo() {
+  if (!checkIsChaptersModeShown()) { placeVideo(); return; }
+  const previousParent = video.parentNode;
+  const wasInView = checkIsInView(previousParent);
+  placeVideo();
+  if (video.parentNode === previousParent || checkIsVideoHome()) return;
+  if (previousParent === nodes.videoHome) showVideo();
+  else if (wasInView) video.closest('.chapter').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+// The video in view, in its chapter's frame in the chapters view.
+function showVideo() {
+  (checkIsVideoHome() ? video : video.parentNode).scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
+// Plays from a scene's or a chapter's start, in view.
 function playFrom(seconds) {
   if (!video) return;
   video.currentTime = seconds;
   video.play();
-  if (!checkIsOutlineBesideVideo()) video.scrollIntoView({block: 'nearest'});
+  placeVideo();
+  showVideo();
 }
 
-// The scene the video is in, with how far into it, whether it plays or not.
-function showOutlineProgress() {
-  if (!nodes.outlineRows) return;
+// The scene the video is in, with how far into it, while it plays in the chapters view.
+function showChapterProgress() {
+  if (!nodes.sceneRows) return;
+  const isInChapter = Boolean(video) && checkIsChaptersModeShown() && !checkIsVideoHome();
   const seconds = video ? video.currentTime : 0;
-  let currentRow = null;
-  for (const {scene, row, bar} of nodes.outlineRows) {
-    const isCurrent = seconds >= scene.startSeconds && seconds < scene.endSeconds;
+  for (const {scene, row, bar} of nodes.sceneRows) {
+    const isCurrent = isInChapter && seconds >= scene.startSeconds && seconds < scene.endSeconds;
     row.classList.toggle('current', isCurrent);
     bar.style.width = isCurrent
       ? `${(100 * (seconds - scene.startSeconds) / (scene.endSeconds - scene.startSeconds)).toFixed(1)}%` : '0';
-    if (isCurrent) currentRow = row;
-  }
-  if (currentRow === currentOutlineRow) return;
-  currentOutlineRow = currentRow;
-  if (currentRow) keepOutlineRowInView(currentRow);
-}
-
-// Beside the video, the outline scrolls by itself to the scene the video moves into, unless the pointer is on it,
-// where the user may be reading another chapter. Under the toolbar it leaves the page where it is.
-function keepOutlineRowInView(row) {
-  const scroller = nodes.outlineScroller;
-  if (!checkIsOutlineBesideVideo() || !checkIsOutlineModeShown() || scroller.matches(':hover')) return;
-  const headHeight = row.closest('.chapter').querySelector('.chapter-head').offsetHeight;
-  const top = row.offsetTop - headHeight;
-  if (top < scroller.scrollTop || row.offsetTop + row.offsetHeight > scroller.scrollTop + scroller.clientHeight) {
-    scroller.scrollTop = top;
   }
 }
 
-function buildOutline(chapters) {
-  nodes.outlineRows = [];
+function buildChapters(chapters) {
+  nodes.sceneRows = [];
   nodes.chapterWhiteboardButtons = [];
-  currentOutlineRow = null;
-  const chapterNodes = chapters.map((chapter, chapterIndex) => {
-    const first = chapter.scenes[0], last = chapter.scenes[chapter.scenes.length - 1];
+  nodes.chapterSections = chapters.map((chapter, chapterIndex) => {
+    const first = chapter.scenes[0], last = chapter.scenes.at(-1);
     const minutes = Math.max(1, Math.round((last.endSeconds - first.startSeconds) / 60));
+    // the chapter's frame before the video plays in it: its first scene's key frame, which plays the chapter
+    const playLabel = translate('chapters.playFrom', {time: formatTime(first.startSeconds)});
+    const cover = buildElement('button', {class: 'cover', type: 'button', 'aria-label': playLabel,
+      onclick: () => playFrom(first.startSeconds)},
+    buildElement('img', {src: getFrameUrl(first.keyFrame), alt: ''}),
+    buildElement('span', {class: 'play'}, buildIcon('play'), playLabel));
+    const frame = buildElement('div', {class: 'frame'}, cover);
     const rows = chapter.scenes.map((scene) => {
       const bar = buildElement('i', {});
       const row = buildElement('div', {class: 'scene', role: 'button', tabindex: '0',
@@ -288,36 +300,43 @@ function buildOutline(chapters) {
         buildElement('div', {class: 'title'}, buildElement('b', {}, scene.title),
           buildElement('span', {class: 'hb-meta'}, formatTime(scene.startSeconds))),
         buildElement('p', {}, scene.summary)));
-      nodes.outlineRows.push({scene, row, bar});
+      nodes.sceneRows.push({scene, row, bar});
       return row;
     });
     const whiteboardButton = buildIconButton('whiteboard', translate('chapters.viewOnWhiteboard'),
       {hidden: true, onclick: () => showChapterOnWhiteboard(chapter.id)});
     nodes.chapterWhiteboardButtons.push(whiteboardButton);
-    return buildElement('section', {class: 'chapter'},
+    const section = buildElement('section', {class: 'chapter'},
       buildElement('div', {class: 'chapter-head'},
         buildElement('h3', {},
           buildElement('span', {class: 'number'}, translate('chapters.chapter', {number: chapterIndex + 1})),
           chapter.title),
         buildElement('span', {class: 'hb-meta'}, translate('chapters.minutes', {minutes})),
         whiteboardButton),
-      buildElement('div', {class: 'scenes'}, rows));
+      buildElement('div', {class: 'chapter-body'}, buildElement('div', {class: 'player'}, frame),
+        buildElement('div', {class: 'scenes'}, rows)));
+    return {section, frame, cover};
   });
-  nodes.outlineScroller.replaceChildren(...chapterNodes);
+  nodes.chapters.replaceChildren(...nodes.chapterSections.map(({section}) => section));
   showChapterWhiteboardButtons();
 }
 
-function showOutline() {
+// The chapters as the agent last wrote them; the video and the composer go back under the title first, and back
+// into a chapter by applyMode.
+function showChapters() {
   const json = JSON.stringify(pageData.chapters);
-  if (json === outlineJson) return;
-  outlineJson = json;
+  if (json === chaptersJson) return;
+  chaptersJson = json;
+  if (video && !checkIsVideoHome()) nodes.videoHome.replaceChildren(video);
+  nodes.toolbar.after(nodes.composer);
   if (pageData.chapters) {
-    buildOutline(pageData.chapters);
+    buildChapters(pageData.chapters);
   } else {
-    nodes.outlineRows = null;
-    nodes.outlineScroller.replaceChildren();
+    nodes.sceneRows = null;
+    nodes.chapterSections = null;
+    nodes.chapters.replaceChildren();
   }
-  applyModes();
+  applyMode();
 }
 
 // Series whiteboard ------------------------------------------------------------------------------------------------
@@ -1165,7 +1184,7 @@ async function loadWhiteboard() {
     }
     openWhiteboardMode();
   }
-  applyModes();
+  applyMode();
   showChapterWhiteboardButtons();
   if (whiteboard.page.savedWhiteboard && whiteboard.page.episodesToAdd.length) mountWhiteboard();
 }
@@ -1195,12 +1214,14 @@ function togglePlay() {
 function seekBy(seconds) {
   if (!video) return;
   video.currentTime = Math.min(Math.max(0, video.currentTime + seconds), video.duration || Infinity);
+  followVideo();
 }
 
 function jumpTo(seconds) {
   if (!video || seconds === null || seconds === undefined) return;
   video.currentTime = seconds;
-  video.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  placeVideo();
+  showVideo();
 }
 
 // Composer ----------------------------------------------------------------------------------------------------------
@@ -1628,7 +1649,7 @@ function showHead() {
       deliveredEpisodes.map((episode) => buildElement('option', {value: episode.id, selected: episode.id === EPISODE_ID},
         `${episode.id.toUpperCase()} · ${episode.title}`)));
     episodeSelect.addEventListener('change', () => {
-      window.location.href = `${BOOT.baseUrl}/video/${episodeSelect.value}${buildModesQuery()}`;
+      window.location.href = `${BOOT.baseUrl}/video/${episodeSelect.value}${buildModeQuery()}`;
     });
     nodes.switcher.replaceChildren(episodeSelect);
   } else {
@@ -1638,7 +1659,7 @@ function showHead() {
 
 function showPage() {
   showHead();
-  showOutline();
+  showChapters();
   showNotices();
   showComments();
   showSurvey();
@@ -1669,28 +1690,36 @@ function mountPage() {
       label: translate('video.subtitles')})));
     video.addEventListener('loadedmetadata', applySubtitles);
   }
-  // A toggle in the toolbar, with its key; applySubtitles and applyModes say whether it is on, and whether it is there.
+  // A toggle in the toolbar, with its key; applySubtitles and applyMode say whether it is on, and whether it is there.
   const buildToggleButton = (textKey, key, onclick) => buildElement('button', {class: 'hb-btn outline', type: 'button',
     onclick}, translate(textKey), buildElement('kbd', {}, key));
   nodes.subtitles = video && pageData.delivery.subtitles.length
     ? buildToggleButton('video.subtitles', 'C', toggleSubtitles) : null;
   nodes.addComment = buildElement('button', {class: 'hb-btn fill', type: 'button', onclick: startComment},
     buildIcon('plus'), translate('video.addComment'), buildElement('kbd', {}, 'M'));
-  // the outline shows once notes.yaml fits the delivered video, which the agent may write while the page is open; the
-  // whiteboard once the page server said what it holds
-  nodes.theaterMode = video ? buildToggleButton('video.theaterMode', 'T', toggleTheaterMode) : null;
-  nodes.outlineMode = video ? buildToggleButton('video.outlineMode', 'O', toggleOutlineMode) : null;
-  nodes.whiteboardMode = video ? buildToggleButton('video.whiteboardMode', 'W', toggleWhiteboardMode) : null;
+  // the chapters view shows once notes.yaml fits the delivered video, which the agent may write while the page is
+  // open; the whiteboard once the page server said what it holds
+  nodes.theaterMode = video ? buildToggleButton('video.theaterMode', 'T', () => toggleMode('theater')) : null;
+  nodes.chaptersMode = video ? buildToggleButton('video.chaptersMode', 'N', () => toggleMode('chapters')) : null;
+  nodes.whiteboardMode = video ? buildToggleButton('video.whiteboardMode', 'W', () => toggleMode('whiteboard')) : null;
   nodes.videoHome = buildElement('div', {class: 'video-home'}, video);
-  nodes.outlineScroller = buildElement('div', {class: 'scroller'});
-  nodes.outline = buildElement('section', {class: 'outline-panel', 'aria-label': translate('video.outlineMode')},
-    nodes.outlineScroller);
+  nodes.chapters = buildElement('section', {class: 'chapters', 'aria-label': translate('video.chaptersMode')});
   nodes.whiteboard = buildElement('section', {class: 'whiteboard', 'aria-label': translate('video.whiteboardMode')});
-  if (video) video.addEventListener('timeupdate', showOutlineProgress);
+  if (video) {
+    video.addEventListener('timeupdate', () => {
+      if (!video.paused && !video.seeking) followVideo();
+      showChapterProgress();
+    });
+    for (const eventName of ['play', 'fullscreenchange', 'leavepictureinpicture']) {
+      video.addEventListener(eventName, followVideo);
+    }
+  }
   const keyHints = video && buildElement('div', {class: 'keys hb-meta'},
     buildElement('span', {}, buildElement('kbd', {}, translate('video.keys.space')), translate('video.keys.play')),
     buildElement('span', {}, buildElement('kbd', {}, '←'), buildElement('kbd', {}, '→'),
       translate('video.keys.seek', {seconds: SEEK_SECONDS})));
+  nodes.toolbar = buildElement('div', {class: 'toolbar'}, nodes.addComment, nodes.subtitles, nodes.theaterMode,
+    nodes.chaptersMode, nodes.whiteboardMode, keyHints);
   appNode.replaceChildren(...[
     buildElement('div', {class: 'topnav'},
       buildElement('a', {class: 'hb-btn text small', href: `${BOOT.baseUrl}/plan`}, buildIcon('back'),
@@ -1699,11 +1728,9 @@ function mountPage() {
     buildElement('div', {class: 'hb-head'}, nodes.eyebrow, nodes.title, nodes.meta),
     nodes.notices,
     video && nodes.videoHome,
-    buildElement('div', {class: 'toolbar'},
-      nodes.addComment,
-      nodes.subtitles, nodes.theaterMode, nodes.outlineMode, nodes.whiteboardMode, keyHints),
+    nodes.toolbar,
     nodes.composer,
-    nodes.outline,
+    nodes.chapters,
     nodes.whiteboard,
     buildElement('section', {class: 'hb-section'},
       buildElement('h2', {}, translate('video.comments.heading'), nodes.commentCount),
@@ -1721,7 +1748,7 @@ function mountPage() {
     nodes.dialog].filter(Boolean));  // no video element when the file is missing, no dev mode sections without it
   showPage();
   applySubtitles();
-  applyModes();
+  applyMode();
   if (pageData.isDevModeOn) fetchCostReport();
   loadWhiteboard();
 }
@@ -1756,9 +1783,9 @@ function runShortcut(key) {
   else if (key === 'ArrowRight') seekBy(SEEK_SECONDS);
   else if (key === 'm') startComment();
   else if (key === 'c') toggleSubtitles();
-  else if (key === 't') toggleTheaterMode();
-  else if (key === 'o') toggleOutlineMode();
-  else if (key === 'w') toggleWhiteboardMode();
+  else if (key === 't') toggleMode('theater');
+  else if (key === 'n') toggleMode('chapters');
+  else if (key === 'w') toggleMode('whiteboard');
   else return false;
   return true;
 }

@@ -9,11 +9,11 @@ and the fields of `notes.yaml` and `heptabase-whiteboard.json` in
 
 ## What the user sees
 
-The video page has two views next to theater mode, both built from the cards the agent writes for each episode
-(`production/episodes/<episode>/notes.yaml`):
+The video page has two views next to theater mode, one of the three at a time, both built from the cards the agent
+writes for each episode (`production/episodes/<episode>/notes.yaml`):
 
-- **Outline** (O): the episode's chapters and scenes beside the video; choosing a scene plays it. It needs nothing from
-  Heptabase.
+- **Chapters** (N): the episode's chapters and scenes, read from top to bottom; choosing a scene plays it in its
+  chapter's frame. It needs nothing from Heptabase.
 - **Whiteboard** (W): every delivered episode's cards on one whiteboard for the series, drawn by Heptabase's web app in
   a frame. An episode is a section, its chapters are sections inside it, a scene is a column of cards, and arrows join
   the cards, also across episodes. The whiteboard is read only on the video page.

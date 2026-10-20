@@ -13,7 +13,7 @@ from .common import add_series_option, open_series, print_result
 @click.argument("episode_id", metavar="EPISODE")
 @click.option("--skip-notes-check", "should_skip_notes_check", is_flag=True,
               help="Deliver without checking the episode's cards (notes.yaml), when the user wants none. The video "
-                   "page then has no outline for it, and the series' whiteboard gets no cards from it.")
+                   "page then has no chapters view for it, and the series' whiteboard gets no cards from it.")
 @add_series_option
 def deliver(episode_id: str, should_skip_notes_check: bool, series_path: Path | None) -> None:
     """Check the render, its automatic checks and the episode's cards (`notes check`), then move the video, subtitles

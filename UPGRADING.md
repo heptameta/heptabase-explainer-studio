@@ -11,7 +11,8 @@ release heading stays `## X.Y.Z`.
 ## Unreleased
 
 - **Cards before delivery.** `deliver` now refuses an episode without `production/episodes/<episode>/notes.yaml`
-  that fits its render: the chapters and cards the video page shows in its outline and on the series' whiteboard. A series needs this
-  step if an episode in it is not delivered yet. Write that episode's cards as `references/cards.md` says
-  (`explainer-studio guide references/cards.md`), alongside its scenes, and check them with `explainer-studio notes
-  check <episode>`. Delivered episodes need nothing; write their cards when the user asks for them.
+  that fits its render: the chapters and cards the video page shows in its chapters view and on the series'
+  whiteboard. A series needs this step if an episode in it is not delivered yet. Write that episode's cards as
+  `references/cards.md` says (`explainer-studio guide references/cards.md`), alongside its scenes, and check them with
+  `explainer-studio notes check <episode>`. Delivered episodes need nothing; write their cards when the user asks for
+  them.
