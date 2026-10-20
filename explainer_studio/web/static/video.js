@@ -159,6 +159,8 @@ function applyMode() {
   // the whiteboard is the whole page and does not scroll, and a reload opens on it, not where the page was
   history.scrollRestoration = isWhiteboardShown ? 'manual' : 'auto';
   if (isWhiteboardShown) { window.scrollTo(0, 0); mountWhiteboard(); }
+  // a hidden whiteboard keeps no keyboard focus, which would take the keys the video's shortcuts need
+  else if (whiteboard.frame && document.activeElement === whiteboard.frame) whiteboard.frame.blur();
   placeVideo();
   showChapterProgress();
 }
@@ -366,6 +368,7 @@ const whiteboard = {
   frameReadyTimerId: null,
   view: 'loading',  // what the whiteboard shows: loading | preview | saved | unreadable | empty
   unreadableReason: null,  // trashed | deleted | forbidden | signedOut | unauthorized | network | notMeasured
+  unreadableSpaceId: null,  // trashed: the saved whiteboard's space, where Heptabase offers to restore it
   previewLayout: null,
   shownWhiteboard: null,  // {title, spaceId, contentBounds} of the saved whiteboard on show
   signInStatus: null,  // how the sign-in this page came back from ended, until the next save
@@ -769,7 +772,9 @@ async function importNewEpisodes() {
   whiteboard.isImporting = false;
   if (result.status === 401) { showUnreadableWhiteboard(findSignInRequiredReason(result)); return; }
   if (result.body.code === 'whiteboard_trashed' || result.body.code === 'whiteboard_deleted') {
-    showUnreadableWhiteboard(result.body.code === 'whiteboard_trashed' ? 'trashed' : 'deleted');
+    // the import runs only after a read, which gave the whiteboard's space
+    showUnreadableWhiteboard(result.body.code === 'whiteboard_trashed' ? 'trashed' : 'deleted',
+      whiteboard.shownWhiteboard.spaceId);
     return;
   }
   if (!result.isOk) {
@@ -792,9 +797,10 @@ async function refreshWhiteboardCards() {
   if (!page.savedWhiteboard) await showWhiteboardPreview();
 }
 
-function showUnreadableWhiteboard(reason) {
+function showUnreadableWhiteboard(reason, spaceId = null) {
   whiteboard.view = 'unreadable';
   whiteboard.unreadableReason = reason;
+  whiteboard.unreadableSpaceId = spaceId;
   showWhiteboardToolbar();
 }
 
@@ -879,7 +885,7 @@ function handleWhiteboardReadReply(message) {
     showWhiteboardToolbar();
     if (!whiteboard.hasImportStarted && whiteboard.page.episodesToAdd.length) importNewEpisodes();
   } else if (message.type === 'failed') {
-    showUnreadableWhiteboard(message.reason);
+    showUnreadableWhiteboard(message.reason, message.spaceId || null);
   }
 }
 
@@ -895,6 +901,14 @@ function handleWhiteboardMessage(event) {
     clearTimeout(whiteboard.frameReadyTimerId);
     whiteboard.isFrameReady = true;
     showSavedWhiteboard();
+  } else if (message.type === 'keyPressed') {
+    // A key pressed in the whiteboard: while the whiteboard has the keyboard focus, this page's keydown never sees a
+    // key. The embedded page leaves out keys with Cmd, Ctrl or Alt, keys typed into a field and keys it handled.
+    // Letters come; Space and the arrow keys may come though the whiteboard uses them, and runShortcut leaves
+    // them alone while the whiteboard shows.
+    if (typeof message.key === 'string' && typeof message.code === 'string' && !(nodes.dialog && nodes.dialog.open)) {
+      runShortcut(resolveShortcutKey(message));
+    }
   } else if (['cardsMeasured', 'whiteboardShown', 'failed'].includes(message.type)) {
     const handleReply = whiteboard.replyHandlerByRequestIdMap.get(message.requestId);
     if (!handleReply) return;
@@ -971,6 +985,11 @@ function buildWhiteboardMenu() {
   return buildElement('div', {class: 'whiteboard-menu-anchor'}, button, menu);
 }
 
+// The saved whiteboard's address in Heptabase's web app, in the space `spaceId`.
+function buildSavedWhiteboardUrl(spaceId) {
+  return `${whiteboard.page.appUrl}/${spaceId}/whiteboard/${whiteboard.page.savedWhiteboard.whiteboardId}`;
+}
+
 function buildUnreadableMessage() {
   const reason = whiteboard.unreadableReason;
   const episodes = whiteboard.page.episodesToAdd;
@@ -991,8 +1010,11 @@ function buildUnreadableMessage() {
       [buildWhiteboardButton('video.whiteboard.retry', reloadWhiteboardFrame)]);
   }
   if (reason === 'trashed') {
+    // the whiteboard itself, which Heptabase shows with Restore; Heptabase's home when its space is not known
+    const restoreUrl = whiteboard.unreadableSpaceId ? buildSavedWhiteboardUrl(whiteboard.unreadableSpaceId)
+      : whiteboard.page.appUrl;
     return buildWhiteboardMessage(translate('video.whiteboard.unreadable.trashed'), [
-      buildElement('a', {class: 'hb-btn', href: whiteboard.page.appUrl, target: '_blank', rel: 'noopener'},
+      buildElement('a', {class: 'hb-btn', href: restoreUrl, target: '_blank', rel: 'noopener'},
         translate('video.whiteboard.restore'), buildIcon('out')), unlink]);
   }
   if (reason === 'deleted') return buildWhiteboardMessage(translate('video.whiteboard.unreadable.deleted'), [unlink]);
@@ -1025,8 +1047,7 @@ function showWhiteboardToolbar() {
   const statuses = [];
   const actions = [];
   if (whiteboard.view === 'saved') {
-    const spaceId = whiteboard.shownWhiteboard.spaceId;
-    const whiteboardUrl = `${page.appUrl}/${spaceId}/whiteboard/${page.savedWhiteboard.whiteboardId}`;
+    const whiteboardUrl = buildSavedWhiteboardUrl(whiteboard.shownWhiteboard.spaceId);
     actions.push(
       buildElement('a', {class: 'hb-btn outline', href: whiteboardUrl, target: '_blank', rel: 'noopener'},
         translate('video.whiteboard.open'), buildIcon('out')),
@@ -1729,12 +1750,11 @@ async function refreshPage() {
   refreshWhiteboardCards();
 }
 
-window.addEventListener('keydown', (event) => {
-  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !pageData) return;
-  if (checkIsTyping(event.target) || checkIsInputMethodKey(event) || (nodes.dialog && nodes.dialog.open)) return;
-  const key = resolveShortcutKey(event);
-  // the whiteboard shows no video: playing and commenting wait until it closes
-  if (checkIsWhiteboardModeShown() && [' ', 'ArrowLeft', 'ArrowRight', 'm', 'c'].includes(key)) return;
+// Runs the shortcut for `key` (as resolveShortcutKey names it); false when the key has none here.
+function runShortcut(key) {
+  // the whiteboard shows no video: playing and commenting wait until it closes; Space and the arrow keys are also the
+  // whiteboard's own, which the embedded page may pass on
+  if (checkIsWhiteboardModeShown() && [' ', 'ArrowLeft', 'ArrowRight', 'm', 'c'].includes(key)) return false;
   if (key === ' ') togglePlay();
   else if (key === 'ArrowLeft') seekBy(-SEEK_SECONDS);
   else if (key === 'ArrowRight') seekBy(SEEK_SECONDS);
@@ -1743,7 +1763,14 @@ window.addEventListener('keydown', (event) => {
   else if (key === 't') toggleMode('theater');
   else if (key === 'n') toggleMode('chapters');
   else if (key === 'w') toggleMode('whiteboard');
-  else return;
+  else return false;
+  return true;
+}
+
+window.addEventListener('keydown', (event) => {
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || !pageData) return;
+  if (checkIsTyping(event.target) || checkIsInputMethodKey(event) || (nodes.dialog && nodes.dialog.open)) return;
+  if (!runShortcut(resolveShortcutKey(event))) return;
   event.preventDefault();
   event.stopPropagation();
 }, true);
