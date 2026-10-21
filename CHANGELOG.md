@@ -6,6 +6,8 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-21
+
 ### Added
 
 - The video page has **Chapters**, which reads the episode from top to bottom: each chapter a large frame beside its
