@@ -6,6 +6,11 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Security
+
+- The guide no longer tells the agent to run whatever it can in a codebase it explains: whether to run a repository's
+  commands is left to the agent and its environment.
+
 ## [1.2.0] - 2026-10-21
 
 ### Added

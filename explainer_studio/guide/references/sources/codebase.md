@@ -30,9 +30,9 @@ written from it, and note where they disagree.
    top-level folder: who uses it, when, and whether it can be deleted.
 3. **Follow one concrete example all the way through.** One request, one command or one file: from coming in to going
    out, which code, which processes and which files it passes through. Every episode can later point back at this route.
-4. **Run it and look; do not only read.** Run what can be run: list the processes really running (`ps`), the files
-   really produced, the real error messages, the real list of tools. Evidence in the video built from this real output
-   is more reliable than inference from the code, and more convincing.
+4. **Real output is better evidence than reading alone.** Where it is available, use it: the processes really running
+   (`ps`), the files really produced, the real error messages, the real list of tools. Evidence in the video built
+   from this real output is more reliable than inference from the code, and more convincing.
 5. **When the documentation and the code disagree, the code is right.** Note the disagreement: it is often a bug, and
    may also be a trap viewers will fall into later.
 6. Before probing the viewer, skim only enough to pick probes: a few real file names, a real piece of configuration, a
