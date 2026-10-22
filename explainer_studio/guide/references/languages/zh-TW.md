@@ -5,6 +5,7 @@ Contents: [Speaking rate and length](#1-speaking-rate-and-length) · [Sentences]
 [Saying mathematics](#5-saying-mathematics-with-the-mathematics-subject-reference) · [Subtitles](#6-subtitles) ·
 [Quotations](#7-translating-quotations) · [Narration voices](#8-narration-voices) ·
 [Characters and length](#9-measured-conversions-between-characters-and-length) · [Fonts](#10-fonts) ·
+[Sharing feedback](#11-sharing-feedback) · [Introducing the whiteboard](#12-introducing-the-whiteboard) ·
 [Self-check](#self-check)
 
 Load this when the narration is Traditional Chinese for Taiwan. Carry 3b1b's spoken English style into Chinese by
@@ -160,6 +161,12 @@ The first time you ask:
 > 會送出這一集的留言和評分（包括你在對話裡對影片說的話）、我對每則留言的處理說明、留言前後的影片截圖、劇本、系列方案和製作花費的數字。不包含教材原檔、完整影片或音檔。這些資料只在 Heptabase 內部使用，也不會拿來訓練 AI 模型。
 >
 > 不分享也可以，我一樣會協助修改影片。
+
+## 12. Introducing the whiteboard
+
+Use this text as it is, at the first delivery of an episode with cards:
+
+> 除了影片，我也把這一集的重點整理成筆記卡片，排在一張白板上，不用重看影片也能複習。在影片頁按「白板」就能看到。每一集是白板上的一個區塊，每個場景的卡片排成一欄，箭頭表示推論的方向；黃色卡片是核心主張，綠色是推出的結論，紅色是常見的錯誤。之後的每一集都會加進同一張白板，按「存到 Heptabase」就能存下來。
 
 ## Self-check
 
