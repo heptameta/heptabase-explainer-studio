@@ -6,6 +6,8 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-22
+
 ### Added
 
 - At the first delivery with cards, the agent introduces the series' whiteboard in a few sentences: where to open it,
