@@ -12,6 +12,8 @@ in [UPGRADING.md](UPGRADING.md).
   commands is left to the agent and its environment.
 - `setup` checks the ffmpeg, ffprobe and Blender it downloads against their published SHA-256 and deletes a file that
   differs before unpacking or running it.
+- Signing in to Heptabase from the video page uses only the sign-in, token and revocation addresses on Heptabase's
+  own HTTPS address, and sends tokens without following redirects.
 
 ## [1.2.0] - 2026-10-21
 

@@ -107,6 +107,9 @@ the same key pressed on the page. When the whiteboard closes, the video page tak
   authorization code flow with PKCE, the scope `openid email offline_access space:read space:write` for the REST API's
   resource, and the account and its email from `/me`. Heptabase sends the browser back to the page server's
   `/heptabase-callback` on 127.0.0.1, and the page server sends it on to the page that started the sign-in.
+- Studio relies on every endpoint in the metadata being on the issuer's own origin over HTTPS (HTTP only on
+  localhost), and refuses to sign in otherwise: the refresh token is kept under the issuer, so it only ever goes back
+  there. Token and revocation requests do not follow redirects.
 - `credentials.toml` keeps the client registration, the account, its email and the refresh token under
   `[heptabase."<issuer>"]`. Access tokens stay in the page server's memory, refreshed five minutes before they expire,
   and in the iframe's.
