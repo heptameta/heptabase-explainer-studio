@@ -14,6 +14,8 @@ in [UPGRADING.md](UPGRADING.md).
   differs before unpacking or running it.
 - Signing in to Heptabase from the video page uses only the sign-in, token and revocation addresses on Heptabase's
   own HTTPS address, and sends tokens without following redirects.
+- A feedback share stops instead of packing a file that a symbolic link or `..` takes outside the series folder.
+- `deliver` refuses a delivery record whose file names are paths instead of removing the files they point to.
 
 ## [1.2.0] - 2026-10-21
 

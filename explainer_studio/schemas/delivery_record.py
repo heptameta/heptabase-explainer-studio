@@ -6,19 +6,25 @@ at the series root is always the newest record's.
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+
+# A file at the series root, never a path: `deliver` removes the previous delivery's files by these names. No separator
+# or drive colon, and not `.` or `..`; the titles in delivered file names have never had any of them.
+DeliveredFileName = Annotated[str, Field(pattern=r"^[^/\\:\x00-\x1f]*[^./\\:\x00-\x1f][^/\\:\x00-\x1f]*$")]
 
 
 class DeliveredSubtitles(BaseModel):
     model_config = ConfigDict(extra="forbid")
     language_code: str
-    file_name: str  # <NN>-<title>.<language code>.srt
+    file_name: DeliveredFileName  # <NN>-<title>.<language code>.srt
 
 
 class DeliveredFiles(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    video_file_name: str
-    cover_file_name: str
+    video_file_name: DeliveredFileName
+    cover_file_name: DeliveredFileName
     subtitles: list[DeliveredSubtitles]  # today one: the episode's language
 
     def list_file_names(self) -> list[str]:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-from delivered_series import create_series, write_render
+from delivered_series import create_series, write_delivery_record, write_render
 
 from explainer_studio import __version__
 from explainer_studio.cli.main import cli
@@ -24,6 +24,19 @@ def test_delivery_record_folders_follow_the_moment_not_the_wall_clock() -> None:
     after_the_clocks_went_back = datetime(2026, 10, 25, 1, 10, tzinfo=UTC)  # 40 minutes later
     assert format_delivery_record_dir_name(summer_time) == "2026-10-25T003000Z"
     assert format_delivery_record_dir_name(after_the_clocks_went_back) > format_delivery_record_dir_name(summer_time)
+
+
+@pytest.mark.parametrize("file_name", ["../thesis.docx", "/etc/hosts", "..\\thesis.docx", "C:thesis.docx"])
+def test_a_delivery_record_naming_a_path_is_refused_before_deliver_removes_anything(tmp_path: Path,
+                                                                                    file_name: str) -> None:
+    series = create_series(tmp_path / "series", should_render=False)
+    record_dir_path = write_delivery_record(series, datetime.now(UTC))
+    metadata = json.loads((record_dir_path / "metadata.json").read_text(encoding="utf-8"))
+    metadata["files"]["video_file_name"] = file_name
+    (record_dir_path / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+    # deliver reads the previous record before it removes that delivery's files
+    with pytest.raises(StudioError):
+        load_latest_delivery_record(series, "ep01")
 
 
 @pytest.mark.render

@@ -637,11 +637,11 @@ today every record is `narration`, and the narration budget sums them.
 **`delivery-records/<delivered time>/`**: one delivery record per delivery, kept forever: `metadata.json`
 (`delivered_at`, `explainer_studio_version`, `earlier_explainer_studio_versions`, `files` with `video_file_name`,
 `cover_file_name` and `subtitles`, a list of `{language_code, file_name}` with one subtitle file per language, named
-`<NN>-<title>.<language code>.srt`; today one, in the episode's language), plus the `timeline.json` and `script.yaml` of
-that delivery. The folder is named by the UTC delivered time, such as `2026-10-06T140211Z`, so the folders sort in
-delivery order; `delivered_at` gives the time in the user's local time. The video in the series folder is the newest
-record's. `earlier_explainer_studio_versions` lists the other Explainer Studio versions used on the episode since the
-previous delivery (empty when the version did not change).
+`<NN>-<title>.<language code>.srt`; today one, in the episode's language; every name is a file in the series folder,
+never a path), plus the `timeline.json` and `script.yaml` of that delivery. The folder is named by the UTC delivered
+time, such as `2026-10-06T140211Z`, so the folders sort in delivery order; `delivered_at` gives the time in the user's
+local time. The video in the series folder is the newest record's. `earlier_explainer_studio_versions` lists the other
+Explainer Studio versions used on the episode since the previous delivery (empty when the version did not change).
 
 **`episodes/<episode>/explainer-studio-versions.json`**: `last_used_version` (the version of the latest command on the
 episode that makes its video) and `versions_since_last_delivery`, kept by the commands that make the video: the

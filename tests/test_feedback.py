@@ -153,6 +153,20 @@ def test_a_bundle_carries_only_its_listed_files(delivered) -> None:
     assert bundle.path_to_content_map["plan.yaml"] == series.plan_file_path.read_bytes()  # whole
 
 
+def test_a_bundle_refuses_a_symbolic_link_instead_of_packing_what_it_points_to(tmp_path: Path,
+                                                                             monkeypatch: pytest.MonkeyPatch) -> None:
+    series = create_series(tmp_path / "series", should_render=False)
+    record_dir_path = write_delivery_record(series, datetime.now(UTC))
+    private_file_path = tmp_path / "credentials"
+    private_file_path.write_text("a private key", encoding="utf-8")
+    (record_dir_path / "script.yaml").unlink()
+    (record_dir_path / "script.yaml").symlink_to(private_file_path)
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
+    monkeypatch.delenv(SESSION_ENV, raising=False)
+    with pytest.raises(StudioError, match="symbolic link"):
+        pack_feedback_bundle(series, "ep01")
+
+
 @pytest.mark.render
 def test_share_marks_what_was_new_only_after_the_receiver_accepts_it(delivered) -> None:
     series, _, receiver = delivered

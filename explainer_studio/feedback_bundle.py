@@ -102,6 +102,18 @@ def _list_comment_screenshot_sheet_file_paths(series: Series, episode_id: str, f
             if isinstance(comment.anchor, MomentAnchor)]
 
 
+def _read_series_file_bytes(series: Series, file_path: Path) -> bytes:
+    """The bytes of a file in the series folder. Raises StudioError when a symbolic link or `..` below the series folder
+    leads anywhere else: a bundle carries only the series' own files."""
+    production_relative_path = series.convert_path_to_production_relative_path(file_path)
+    if file_path.resolve() != series.root_dir_path.resolve() / file_path.relative_to(series.root_dir_path):
+        raise StudioError(f"{production_relative_path} is a symbolic link or leads outside its folder",
+                          "Explainer Studio never makes one, and a feedback bundle carries only the series' own files",
+                          "nothing was sent: tell the user, replace it with the file itself or remove it, then share "
+                          "again")
+    return file_path.read_bytes()
+
+
 def pack_feedback_bundle(series: Series, episode_id: str) -> FeedbackBundle:
     """The bundle the episode would send now."""
     feedback = load_feedback(series, episode_id)
@@ -111,7 +123,8 @@ def pack_feedback_bundle(series: Series, episode_id: str) -> FeedbackBundle:
     path_to_content_map: dict[str, str | bytes] = {
         series.convert_path_to_production_relative_path(episode_paths.feedback_file_path):
             serialize_json(feedback.model_dump(mode="json")),
-        series.convert_path_to_production_relative_path(series.plan_file_path): series.plan_file_path.read_bytes(),
+        series.convert_path_to_production_relative_path(series.plan_file_path):
+            _read_series_file_bytes(series, series.plan_file_path),
         series.convert_path_to_production_relative_path(series.gaps_file_path):
             serialize_json(gaps.model_dump(mode="json")),
     }
@@ -122,7 +135,7 @@ def pack_feedback_bundle(series: Series, episode_id: str) -> FeedbackBundle:
                              *delivery_record_file_paths]:
         if packed_file_path.is_file():
             production_relative_path = series.convert_path_to_production_relative_path(packed_file_path)
-            path_to_content_map[production_relative_path] = packed_file_path.read_bytes()
+            path_to_content_map[production_relative_path] = _read_series_file_bytes(series, packed_file_path)
     path_to_content_map["environment.json"] = serialize_json({"explainer_studio_version": __version__,
                                                          "operating_system": platform.platform(terse=True)})
     path_to_content_map["cost.json"] = serialize_json(cost_report.model_dump(mode="json"))
