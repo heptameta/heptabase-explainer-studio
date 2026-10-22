@@ -65,13 +65,9 @@ which would cross the whole whiteboard while the flow already reaches the answer
 On the whiteboard a card sits one row below the cards of its scene that lead to it, so a scene reads downwards and a
 claim's cases sit side by side. An arrow to a card of a later scene or chapter runs from side to side.
 
-The series shares one whiteboard. When an episode picks up where an earlier one stopped, draw an arrow from the earlier
-episode's card into this one: in this episode's `notes.yaml`, `continues_from: [<episode>/<card id>]` on the card the
-argument picks up at. It is written in the later episode, so an episode already delivered (and perhaps already on the
-user's whiteboard) never changes for it. Read the earlier episodes' cards before writing, so that this episode's cards
-connect to them instead of repeating them. The arrow goes onto the whiteboard with this episode only when the earlier
-episode is on it by then, or goes with it; when the earlier episode is added later (its cards were written afterwards),
-the arrow is not drawn, and is added in Heptabase with the Heptabase CLI or MCP.
+The series shares one whiteboard, with each episode in a section of its own. Arrows join the cards of one episode
+only; leave `continues_from` out, since an arrow between episodes crosses the sections in between and clutters the
+whiteboard. Read the earlier episodes' cards before writing, so that this episode's cards do not repeat them.
 
 ## Writing them
 
@@ -89,9 +85,8 @@ the arrow is not drawn, and is added in Heptabase with the Heptabase CLI or MCP.
 
 When an episode changes after delivery (a scene added, removed or rewritten), update its cards before delivering it
 again. For an episode already on the user's saved whiteboard, the change stays in notes.yaml and never reaches the
-whiteboard (see below), and a card id changed there drops the arrows that later episodes draw to it. When the user
-asks for cards for episodes delivered before cards existed, write them the same way, one episode at a time in plan
-order, and check each with `notes check`.
+whiteboard (see below). When the user asks for cards for episodes delivered before cards existed, write them the same
+way, one episode at a time in plan order, and check each with `notes check`.
 
 ## Once the whiteboard is saved
 

@@ -6,6 +6,11 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Changed
+
+- The agent draws a card's arrows only within its episode, so the series' whiteboard has no arrows running between
+  episodes' sections.
+
 ### Fixed
 
 - Paid narration stays within its budget: a request whose answer was lost is not sent again and its estimate counts
