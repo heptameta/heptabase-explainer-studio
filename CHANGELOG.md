@@ -6,6 +6,11 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- Paid narration stays within its budget: a request whose answer was lost is not sent again and its estimate counts
+  as spent, and a second `narrate` run in the same series waits for the first instead of paying for the same beats.
+
 ### Security
 
 - The guide no longer tells the agent to run whatever it can in a codebase it explains: whether to run a repository's

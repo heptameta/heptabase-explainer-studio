@@ -8,13 +8,16 @@ decide what to reuse; `render` uses it to refuse an episode with missing or outd
 
 from __future__ import annotations
 
+import contextlib
 import os
 import subprocess
 import tempfile
 import wave
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from filelock import FileLock, Timeout
 
 from . import languages, narration_providers, user_dirs
 from .audience_review import require_script_review
@@ -30,7 +33,7 @@ from .schemas.narration import NarratedBeat, NarrationRecord
 from .schemas.plan import NarrationSettings, Plan
 from .schemas.script import Beat, Script
 from .script import load_script
-from .spending import record_spending, require_within_budget
+from .spending import format_usd, record_spending, require_within_budget
 
 SAMPLE_RATE_HERTZ = 48000
 # speech-rate outliers: shorter than this, or faster/slower than these multiples of the episode's typical rate
@@ -87,6 +90,33 @@ class NarrationRun:
 def narrate(series: Series, episode_id: str, forced_beat_ids: list[str] | None = None,
             report_progress: ProgressReporter = lambda message: None) -> NarrationRun:
     """Synthesize the beats that need it (plus `forced_beat_ids`), keeping each beat's progress on disk as it lands."""
+    narration_settings = load_plan(series).resolve_episode_narration_settings(episode_id)
+    if narration_settings is None or not narration_providers.get_provider(narration_settings.provider_name).is_paid:
+        return _make_narration(series, episode_id, forced_beat_ids, report_progress)
+    # the plan and the script are read once the lock is held, so a run that waited pays for their latest text
+    with _hold_paid_narration_lock(series, report_progress):
+        return _make_narration(series, episode_id, forced_beat_ids, report_progress)
+
+
+@contextlib.contextmanager
+def _hold_paid_narration_lock(series: Series, report_progress: ProgressReporter) -> Iterator[None]:
+    """One paid narrate run per series at a time, from reading the script to the last paid call: a run checks the
+    budget against everything earlier runs spent, and two runs of an episode never pay for the same beat. The lock
+    goes with the process, also when it is killed."""
+    lock = FileLock(str(series.paid_narration_lock_file_path))
+    try:
+        lock.acquire(timeout=0)
+    except Timeout:
+        report_progress("waiting for another narrate run in this series, which pays for its narration, to finish")
+        lock.acquire()
+    try:
+        yield
+    finally:
+        lock.release()
+
+
+def _make_narration(series: Series, episode_id: str, forced_beat_ids: list[str] | None,
+                    report_progress: ProgressReporter) -> NarrationRun:
     plan = load_plan(series)
     script = load_script(series, episode_id)
     narration_settings = plan.resolve_episode_narration_settings(episode_id)
@@ -98,7 +128,6 @@ def narrate(series: Series, episode_id: str, forced_beat_ids: list[str] | None =
     provider = narration_providers.get_provider(narration_settings.provider_name)
     provider.require_available()
     require_script_review(series, episode_id, script)
-
     beats = script.list_beats()
     current_beat_ids = {beat.id for beat in beats}
     forced_beat_ids = list(dict.fromkeys(forced_beat_ids or []))
@@ -170,8 +199,16 @@ def narrate(series: Series, episode_id: str, forced_beat_ids: list[str] | None =
                                                 previous_spoken_text, next_spoken_text, api_key, language_code,
                                                 ffmpeg_path, run, switch_record)
         except SynthesisError as error:
-            run.failure_by_beat_id_map[beat.id] = str(error)
-            report_progress(f"  failed: {error}")
+            failure = str(error)
+            if error.was_possibly_charged and provider.is_paid:
+                # counted as spent, so the budget never leaves out a charge the service may have made
+                cost_usd = provider.estimate_cost_usd(spoken_text, narration_settings)
+                record_spending(series, episode_id, provider.name, len(spoken_text), cost_usd, is_estimated=True)
+                run.cost_usd += cost_usd
+                run.is_cost_estimated = True
+                failure += f"; its estimated {format_usd(cost_usd)} is counted as spent"
+            run.failure_by_beat_id_map[beat.id] = failure
+            report_progress(f"  failed: {failure}")
             continue
         except StudioError as error:
             if not run.made_beat_ids:

@@ -26,12 +26,22 @@ if TYPE_CHECKING:
     from . import NarrationProviderName
 
 TRANSIENT_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+# A POST makes audio the service bills for. It is sent again only when the service cannot have made that audio: the
+# connection never opened, or the service itself answered that it did not. After a gateway's 502 or 504, or an answer
+# lost on the way, it may have, and a second request could be charged again.
+UNSENT_REQUEST_ERROR_CLASSES = (httpx.ConnectError, httpx.ConnectTimeout)
+UNMADE_AUDIO_STATUS_CODES = {408, 429, 500, 503}
 ATTEMPT_COUNT = 5
 TIMEOUT_SECONDS = 120
 
 
 class SynthesisError(Exception):
-    """One beat could not be synthesized; other beats may still work."""
+    """One beat could not be synthesized; other beats may still work. `was_possibly_charged`: the request may have
+    reached the service and been billed although no audio came back."""
+
+    def __init__(self, message: str, was_possibly_charged: bool = False):
+        super().__init__(message)
+        self.was_possibly_charged = was_possibly_charged
 
 
 @dataclass(frozen=True)
@@ -120,18 +130,28 @@ def estimate_speech_minutes(text: str, provider_name: NarrationProviderName, spe
 def request(method: str, url: str, service_name: str,
             check_is_final_response: Callable[[httpx.Response], bool] | None = None, **kwargs) -> httpx.Response:
     """One HTTP request, retried with backoff on network errors and transient statuses (429, 5xx) unless
-    `check_is_final_response` says the response will not change (an exhausted quota). Returns the last response,
-    whatever its status, so the provider can explain it; raises SynthesisError when the service never answered."""
+    `check_is_final_response` says the response will not change (an exhausted quota). A POST, which the service bills,
+    is retried only when the service cannot have made the audio (UNMADE_AUDIO_STATUS_CODES); after any other failure
+    SynthesisError says it may have been charged. Returns the last response, whatever its status, so the provider can
+    explain it; raises SynthesisError when the service never answered."""
+    is_billed = method == "POST"
+    retry_status_codes = UNMADE_AUDIO_STATUS_CODES if is_billed else TRANSIENT_STATUS_CODES
     for attempt in range(ATTEMPT_COUNT):
         is_last_attempt = attempt == ATTEMPT_COUNT - 1
         try:
             response = httpx.request(method, url, timeout=TIMEOUT_SECONDS, **kwargs)
         except httpx.RequestError as error:
+            if is_billed and not isinstance(error, UNSENT_REQUEST_ERROR_CLASSES):
+                raise SynthesisError(f"no answer from {service_name} ({type(error).__name__}); not sent again, since "
+                                     "it may have been charged", was_possibly_charged=True) from None
             if is_last_attempt:
                 raise SynthesisError(f"could not reach {service_name}: {type(error).__name__}") from None
             wait_seconds = 2.0 * 2 ** attempt
         else:
-            if (response.status_code not in TRANSIENT_STATUS_CODES or is_last_attempt
+            if is_billed and response.status_code in TRANSIENT_STATUS_CODES - UNMADE_AUDIO_STATUS_CODES:
+                raise SynthesisError(f"{service_name} HTTP {response.status_code} from a gateway; not sent again, "
+                                     "since it may have been charged", was_possibly_charged=True)
+            if (response.status_code not in retry_status_codes or is_last_attempt
                     or (check_is_final_response and check_is_final_response(response))):
                 return response
             wait_seconds = _parse_retry_after_seconds(response) or 2.0 * 2 ** attempt

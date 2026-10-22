@@ -117,6 +117,11 @@ class Series:
         return self.production_dir_path / "spending.jsonl"
 
     @property
+    def paid_narration_lock_file_path(self) -> Path:
+        """Held by a narrate run that pays for its narration, so one such run in the series goes at a time."""
+        return self.production_dir_path / "paid-narration.lock"
+
+    @property
     def credits_file_path(self) -> Path:
         return self.production_dir_path / "credits.yaml"
 
