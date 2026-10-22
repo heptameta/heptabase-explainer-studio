@@ -20,18 +20,21 @@ from explainer_studio.narration_providers.base import SynthesisError
 class RequestRecorder:
     """Stands in for httpx.request: answers with the queued responses and keeps the requests."""
 
-    def __init__(self, *responses: httpx.Response) -> None:
+    def __init__(self, *responses: httpx.Response | httpx.RequestError) -> None:
         self.responses = list(responses)
         self.requests: list[dict] = []
 
     def __call__(self, method: str, url: str, **kwargs) -> httpx.Response:
         self.requests.append({"method": method, "url": url, **kwargs})
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 @pytest.fixture
 def recorded(monkeypatch: pytest.MonkeyPatch):
-    def install(*responses: httpx.Response) -> RequestRecorder:
+    def install(*responses: httpx.Response | httpx.RequestError) -> RequestRecorder:
         fake = RequestRecorder(*responses)
         monkeypatch.setattr(base.httpx, "request", fake)
         monkeypatch.setattr(base.time, "sleep", lambda seconds: None)
@@ -108,6 +111,25 @@ def test_openai_sends_default_teacher_instructions_and_does_not_retry_an_empty_q
     with pytest.raises(StudioError, match="OpenAI refused"):
         openai.Provider().synthesize("Hello.", settings, tmp_path / "b.wav", "key", "en")
     assert len(recorder.requests) == 1
+
+
+@pytest.mark.parametrize(("failure", "was_possibly_charged"), [
+    (httpx.ConnectError("refused"), False),  # never reached the service
+    (httpx.Response(503, text="overloaded"), False),  # the service answered that it made nothing
+    (httpx.ReadTimeout("no answer"), True),  # the answer was lost: the audio may have been made and billed
+    (httpx.Response(502, text="bad gateway"), True),
+])
+def test_a_paid_request_is_sent_again_only_when_the_service_cannot_have_made_the_audio(
+        recorded, tmp_path, failure: httpx.Response | httpx.RequestError, was_possibly_charged: bool) -> None:
+    recorder = recorded(failure, httpx.Response(200, content=build_wav_bytes()))
+    settings = openai.Settings(provider_name="openai")
+    if was_possibly_charged:
+        with pytest.raises(SynthesisError, match="may have been charged") as error:
+            openai.Provider().synthesize("Hello.", settings, tmp_path / "a.wav", "key", "en")
+        assert error.value.was_possibly_charged and len(recorder.requests) == 1
+    else:
+        openai.Provider().synthesize("Hello.", settings, tmp_path / "a.wav", "key", "en")
+        assert len(recorder.requests) == 2
 
 
 def test_voai_tells_settings_errors_from_server_errors(recorded, tmp_path) -> None:

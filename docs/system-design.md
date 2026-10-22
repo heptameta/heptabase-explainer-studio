@@ -90,7 +90,7 @@ video; nothing else is enforced.
 | Gate | Checked by | Rule |
 |---|---|---|
 | Script audience review | `narrate` | every scene read; a scene lost in its latest read is read again, settled after three rounds |
-| Budget | `narrate` | spending so far plus this run's estimate stays within the narration budget |
+| Budget | `narrate` | spending so far plus this run's estimate stays within the narration budget; one paid run per series at a time |
 | Narration | `render` | every beat narrated with its current spoken text and narration settings |
 | Scene code | `preview`, `render` | Manim Community syntax and known ManimGL pitfalls are refused before rendering |
 | Render | `deliver` | the render was made from the script's current narration text |

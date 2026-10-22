@@ -632,7 +632,8 @@ new one). No token is ever written to it.
 
 **`spending.jsonl`**: one line per paid call:
 `{kind, spent_at, episode_id, provider_name, character_count, cost_usd, is_estimated}`. `kind` says what was paid for;
-today every record is `narration`, and the narration budget sums them.
+today every record is `narration`, and the narration budget sums them. A call whose answer was lost may have been
+charged, so it gets a line with its estimate even though its beat failed.
 
 **`delivery-records/<delivered time>/`**: one delivery record per delivery, kept forever: `metadata.json`
 (`delivered_at`, `explainer_studio_version`, `earlier_explainer_studio_versions`, `files` with `video_file_name`,

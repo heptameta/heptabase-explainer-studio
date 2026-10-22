@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import struct
+import threading
 import wave
 from pathlib import Path
 
@@ -85,7 +86,10 @@ class FakeVoice(NarrationProvider):
         self.spoken_texts: list[str] = []
         self.neighbor_spoken_texts: list[tuple[str | None, str | None]] = []
         self.failing_text: str | None = None
+        self.is_failure_possibly_charged = False
         self.refuse_after_count: int | None = None
+        self.first_call_started_event = threading.Event()
+        self.first_call_release_event: threading.Event | None = None  # the first call waits for it
 
     def estimate_cost_usd(self, text, settings) -> float:
         return 0.01
@@ -96,8 +100,11 @@ class FakeVoice(NarrationProvider):
             raise StudioError("the service refused the key")
         self.spoken_texts.append(text)
         self.neighbor_spoken_texts.append((previous_spoken_text, next_spoken_text))
+        if self.first_call_release_event is not None and len(self.spoken_texts) == 1:
+            self.first_call_started_event.set()
+            self.first_call_release_event.wait(timeout=10)
         if self.failing_text and self.failing_text in text:
-            raise SynthesisError("timed out")
+            raise SynthesisError("timed out", was_possibly_charged=self.is_failure_possibly_charged)
         seconds = len(text.split()) / 2.7
         samples = b"".join(struct.pack("<h", int(8000 * math.sin(i / 10))) for i in range(int(24000 * seconds)))
         write_pcm_wav(output_wav_file_path, samples, 24000)
@@ -170,6 +177,40 @@ def test_a_failed_beat_keeps_its_old_audio_and_is_retried_next_time(series, voic
     assert run.failure_by_beat_id_map == {"low": "timed out"}
     assert series.get_episode_paths("ep01").get_narration_audio_file_path("low").read_bytes() == before
     assert find_ep01_beat_ids_needing_narration(series) == ["low"]
+
+
+@pytest.mark.render
+def test_a_beat_that_may_have_been_charged_counts_its_estimate_as_spent(series, voice) -> None:
+    voice.failing_text = "low"
+    voice.is_failure_possibly_charged = True
+    run = narrate(series, "ep01")
+    assert "counted as spent" in run.failure_by_beat_id_map["low"]
+    records = read_jsonl(series.spending_file_path)
+    assert len(records) == 3 and all(record["is_estimated"] for record in records)  # two made, one maybe charged
+
+
+@pytest.mark.render
+def test_two_narrate_runs_at_once_pay_for_each_beat_once(series, voice) -> None:
+    voice.first_call_release_event = threading.Event()
+    run_waiting_event = threading.Event()
+
+    def report_progress(message: str) -> None:
+        if "waiting" in message:
+            run_waiting_event.set()
+
+    runs = [threading.Thread(target=narrate, args=(series, "ep01"), kwargs={"report_progress": report_progress})
+            for _ in range(2)]
+    for run in runs:
+        run.start()
+    voice.first_call_started_event.wait(timeout=10)  # one run read the script and is at its first paid call
+    run_waiting_event.wait(timeout=10)  # the other waits for it
+    edit(series.get_episode_paths("ep01").script_file_path, "it is low.", "it is lower.")
+    voice.first_call_release_event.set()
+    for run in runs:
+        run.join(timeout=60)
+    # the run that waited reused what the other made and paid only for the beat edited while it waited
+    assert voice.spoken_texts[3:] == ["On the right it is lower."]
+    assert len(read_jsonl(series.spending_file_path)) == 4
 
 
 @pytest.mark.render
