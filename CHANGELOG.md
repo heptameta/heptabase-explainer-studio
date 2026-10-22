@@ -6,6 +6,11 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Added
+
+- At the first delivery with cards, the agent introduces the series' whiteboard in a few sentences: where to open it,
+  how it is laid out, what the card colours mean, and what "Save to Heptabase" does.
+
 ### Changed
 
 - The agent draws a card's arrows only within its episode, so the series' whiteboard has no arrows running between

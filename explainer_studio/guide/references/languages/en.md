@@ -91,6 +91,10 @@ Load this when the narration is English. Length is counted in **words**.
 
 - Use the texts in `workflow/feedback.md` as they are.
 
+## 12. Introducing the whiteboard
+
+- Use the text in `guide.md` (Deliver) as it is.
+
 ## Self-check
 
 - [ ] The narration was read through aloud: no long written-style sentences, no stock opening, every sentence points at

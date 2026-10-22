@@ -193,6 +193,16 @@ subtitles and cover to the series folder. Then run `explainer-studio video open
 audience reviewers still got lost when the review stopped (deliver lists them) and where the script departed from the
 plan.
 
+The first time you deliver an episode with cards in a series, also introduce the series' whiteboard in that message.
+When the language reference of the user's language gives its own wording (section 12), use it; otherwise say this in
+the user's language:
+
+> Besides the video, I wrote the episode's key points as note cards and laid them out on a whiteboard, so you can
+> review without watching again: press "Whiteboard" on the video page. Each episode is a section of the whiteboard,
+> each scene's cards stand in a column, and arrows show where the reasoning goes. Yellow cards are the central claims,
+> green ones conclusions, red ones common mistakes. Every later episode is added to the same whiteboard; press "Save
+> to Heptabase" to keep it.
+
 ### 6. After delivery
 
 Follow `workflow/feedback.md`. Comments made on the video page reach you only through `feedback.json`: read it for
