@@ -72,10 +72,12 @@ def _find_unpacked_root(unpacked_dir_path: Path) -> Path:
     return children[0] if len(children) == 1 and children[0].is_dir() else unpacked_dir_path
 
 
-def _download(url: str, target_file_path: Path, report_progress: ProgressReporter, label: str) -> Path:
+def _download(url: str, target_file_path: Path, report_progress: ProgressReporter, label: str,
+              expected_sha256: str | None = None) -> Path:
     from .assets.fetch import download
 
-    return download(url, target_file_path, report_progress, label, timeout_seconds=300)
+    return download(url, target_file_path, report_progress, label, timeout_seconds=300,
+                    expected_sha256=expected_sha256)
 
 
 # ManimGL and the GPU ------------------------------------------------------------------------------------------------
@@ -118,9 +120,22 @@ def check_manimgl() -> Check:
 
 
 # ffmpeg -------------------------------------------------------------------------------------------------------------
-# Static builds of one pinned release for every platform (github.com/eugeneware/ffmpeg-static).
+# Static builds of one pinned release for every platform (github.com/eugeneware/ffmpeg-static). They are run, so each
+# file must match the SHA-256 GitHub lists for that release's asset; a new release changes both together.
 FFMPEG_RELEASE = "b6.1.1"
 FFMPEG_URL = "https://github.com/eugeneware/ffmpeg-static/releases/download/{release}/{tool}-{platform}.gz"
+FFMPEG_SHA256_BY_FILE_NAME_MAP = {
+    "ffmpeg-darwin-arm64.gz": "8923876afa8db5585022d7860ec7e589af192f441c56793971276d450ed3bbfa",
+    "ffmpeg-darwin-x64.gz": "929b375c1182d956c51f7ac25e0b2b0411fb01f6f407aa15c9758efeb4242106",
+    "ffmpeg-linux-arm64.gz": "754a678672298bc68156adff58aa7385a592c2b30b1d0ae8750c45c915c4bac0",
+    "ffmpeg-linux-x64.gz": "bfe8a8fc511530457b528c48d77b5737527b504a3797a9bc4866aeca69c2dffa",
+    "ffmpeg-win32-x64.gz": "8883a3dffbd0a16cf4ef95206ea05283f78908dbfb118f73c83f4951dcc06d77",
+    "ffprobe-darwin-arm64.gz": "d986a8ec7b030899fe66a8a288ed809a3543338705a3ce178cfb85869c5d80be",
+    "ffprobe-darwin-x64.gz": "d4da574d6e2e197bd259b47d69cf262df9e312af24ad960444f6d806d3d4c186",
+    "ffprobe-linux-arm64.gz": "2ab6aba60ee84412dff9188720703376cb4e7aaf7e0b5e43aa8249f2acae5bf8",
+    "ffprobe-linux-x64.gz": "25d9b6ccb05e3d9de9e04e31e2506d8dd7f9f0418981965ac6df12e8d3afd067",
+    "ffprobe-win32-x64.gz": "f309e6223ad89d2fe54bccd420a7709b66fd27540674e92309578ed491a43c8d",
+}
 
 
 def _resolve_ffmpeg_platform() -> str | None:
@@ -177,7 +192,8 @@ def ensure_ffmpeg(report_progress: ProgressReporter) -> str:
         report_progress(f"downloading {tool} {FFMPEG_RELEASE} for {ffmpeg_platform}")
         with tempfile.TemporaryDirectory() as temporary_dir_path:
             ffmpeg_url = FFMPEG_URL.format(release=FFMPEG_RELEASE, tool=tool, platform=ffmpeg_platform)
-            archive_file_path = _download(ffmpeg_url, Path(temporary_dir_path) / f"{tool}.gz", report_progress, tool)
+            archive_file_path = _download(ffmpeg_url, Path(temporary_dir_path) / f"{tool}.gz", report_progress, tool,
+                                          FFMPEG_SHA256_BY_FILE_NAME_MAP[f"{tool}-{ffmpeg_platform}.gz"])
             binary_file_path = ffmpeg_dir_path / f"{tool}{suffix}"
             ffmpeg_dir_path.mkdir(parents=True, exist_ok=True)
             partial_file_path = binary_file_path.with_name(binary_file_path.name + ".part")
@@ -207,6 +223,8 @@ TEX_FILE_NAME_BY_PACKAGE_MAP = {
 TEX_PROGRAM_BY_PACKAGE_MAP = {"xetex": "xelatex", "latex-bin": "latex", "dvisvgm": "dvisvgm"}
 # fonts only a few formulas use (the calligra font): installed into TinyTeX, but a system TeX without them is still used
 TINYTEX_EXTRA_PACKAGES = ("calligra",)
+# The daily bundle, neither pinned nor checked against a SHA-256: setup always installs packages with tlmgr, and a
+# TinyTeX from an earlier TeX Live year cannot install from CTAN once the next year's TeX Live is out.
 TINYTEX_URL = "https://github.com/rstudio/tinytex-releases/releases/download/daily/{bundle}"
 
 
@@ -498,6 +516,14 @@ BLENDER_BUILD_BY_PLATFORM_MAP = {  # official builds; Blender 5 dropped Intel Ma
     ("windows", "arm64"): "5.1.2/blender-5.1.2-windows-arm64.zip",
 }
 BLENDER_URL = "https://download.blender.org/release/Blender{series}/{file}"
+# from blender.org's blender-<version>.sha256 next to each build; a new build changes both together
+BLENDER_SHA256_BY_FILE_NAME_MAP = {
+    "blender-5.1.2-macos-arm64.dmg": "f104ffee2ba6aee32328e5c203b7e4608d8a1745f7bbcf2766f3b9777e8fbe17",
+    "blender-4.5.14-macos-x64.dmg": "613e73339e97bd113adeeb28d9155beeacf2df7119ee4dbd6bdce234843645f6",
+    "blender-5.1.2-linux-x64.tar.xz": "aaccb355f50183979b698bcce7467103a76261b5fa59f4972295842662a285fb",
+    "blender-5.1.2-windows-x64.zip": "345bedea7b0acf7cc9666423d8553f9129622aea34ded65c23e8cb70f83f14ff",
+    "blender-5.1.2-windows-arm64.zip": "91d39ca72ed4862724eb4398ccfc11913e0650654175efed72023efd7748960e",
+}
 MIN_BLENDER_VERSION = (4, 2)  # the render script uses the 4.2+ material and import APIs
 
 
@@ -557,7 +583,7 @@ def ensure_blender(report_progress: ProgressReporter) -> str:
     with tempfile.TemporaryDirectory() as temporary_dir_path:
         report_progress(f"downloading Blender {build_version} (several hundred MB)")
         archive_file_path = _download(url, Path(temporary_dir_path) / build_file_name, report_progress,
-                                      f"Blender {build_version}")
+                                      f"Blender {build_version}", BLENDER_SHA256_BY_FILE_NAME_MAP[build_file_name])
         report_progress("unpacking Blender")
         unpacked_dir_path = Path(temporary_dir_path) / "unpacked"
         unpacked_dir_path.mkdir()

@@ -10,6 +10,8 @@ in [UPGRADING.md](UPGRADING.md).
 
 - The guide no longer tells the agent to run whatever it can in a codebase it explains: whether to run a repository's
   commands is left to the agent and its environment.
+- `setup` checks the ffmpeg, ffprobe and Blender it downloads against their published SHA-256 and deletes a file that
+  differs before unpacking or running it.
 
 ## [1.2.0] - 2026-10-21
 
