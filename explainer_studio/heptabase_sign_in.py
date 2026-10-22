@@ -22,7 +22,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any, Literal
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import httpx
 
@@ -42,6 +42,8 @@ CREDENTIALS_TABLE_NAME = "heptabase"
 ACCESS_TOKEN_MARGIN_SECONDS = 5 * 60
 SIGN_IN_ATTEMPT_LIFETIME_SECONDS = 15 * 60
 REQUEST_TIMEOUT_SECONDS = 60
+# the hosts a Heptabase may answer on over plain HTTP: a local backend while developing
+LOOPBACK_HOST_NAMES = ("localhost", "127.0.0.1", "::1")
 
 # upgradeRequired: Heptabase answered that this Studio is too old for it (UPGRADE_REQUIRED_CODE)
 SignInStatus = Literal["pending", "signedIn", "canceled", "failed", "upgradeRequired"]
@@ -153,6 +155,35 @@ def _read_error_code(response_body: Any) -> str | None:
     return response_body.get("code") if isinstance(response_body, dict) else None
 
 
+def _resolve_origin(url: Any) -> str | None:
+    """`scheme://host[:port]` of an HTTPS URL, or an HTTP one on a loopback host; None for any other value (another
+    scheme such as `javascript:`, credentials in the URL, not a string)."""
+    if not isinstance(url, str):
+        return None
+    try:
+        parts = urlsplit(url)
+    except ValueError:  # such as an unclosed `[` around the host
+        return None
+    is_secure = parts.scheme == "https" or (parts.scheme == "http" and parts.hostname in LOOPBACK_HOST_NAMES)
+    if not is_secure or not parts.hostname or parts.username is not None or parts.password is not None:
+        return None
+    return f"{parts.scheme}://{parts.netloc.lower()}"
+
+
+def _require_endpoints_on_issuer_origin(api_url: str, metadata: dict[str, Any]) -> None:
+    """Refuse metadata whose endpoints are not on the issuer's own origin over HTTPS: the stored sign-in is kept under
+    the issuer, so its refresh token only ever goes to that origin, and the browser is only ever sent there."""
+    issuer_origin = _resolve_origin(metadata.get("issuer"))
+    for field_name in ("issuer", "authorization_endpoint", "token_endpoint", "registration_endpoint",
+                       "revocation_endpoint"):
+        if issuer_origin is None or _resolve_origin(metadata.get(field_name)) != issuer_origin:
+            raise StudioError("Heptabase's sign-in is not available",
+                              f"the metadata at {api_url} gives {field_name} {metadata.get(field_name)!r}, which is "
+                              "not on the issuer's own HTTPS origin",
+                              "check EXPLAINER_STUDIO_HEPTABASE_API_URL if it is set; otherwise try again later, and "
+                              "if it keeps failing, tell the Heptabase team")
+
+
 def fetch_authorization_server(api_url: str) -> AuthorizationServer:
     """Heptabase's OAuth server as its metadata describes it, asked once per process."""
     if api_url in _authorization_server_by_api_url_map:
@@ -161,8 +192,9 @@ def fetch_authorization_server(api_url: str) -> AuthorizationServer:
     if status_code != 200 or not isinstance(metadata, dict):
         raise StudioError("Heptabase's sign-in is not available", f"its metadata answered HTTP {status_code}",
                           "try again later")
+    _require_endpoints_on_issuer_origin(api_url, metadata)
     authorization_server = AuthorizationServer(
-        issuer=str(metadata["issuer"]).rstrip("/"), authorization_endpoint=metadata["authorization_endpoint"],
+        issuer=metadata["issuer"].rstrip("/"), authorization_endpoint=metadata["authorization_endpoint"],
         token_endpoint=metadata["token_endpoint"], registration_endpoint=metadata["registration_endpoint"],
         revocation_endpoint=metadata["revocation_endpoint"])
     _authorization_server_by_api_url_map[api_url] = authorization_server
@@ -280,7 +312,8 @@ def _remember_access_token(issuer: str, token_response: dict[str, Any], sign_in:
 
 def _request_tokens(api_url: str, form: dict[str, str]) -> tuple[int, Any]:
     authorization_server = fetch_authorization_server(api_url)
-    return _fetch_json("POST", authorization_server.token_endpoint,
+    # a redirect would carry the code or the refresh token to wherever it points
+    return _fetch_json("POST", authorization_server.token_endpoint, follow_redirects=False,
                        data={**form, "resource": authorization_server.resource_url})
 
 
@@ -364,7 +397,7 @@ def sign_out(api_url: str) -> None:
             sign_in = _read_sign_in(issuer)
             if sign_in.get("refresh_token") and sign_in.get("client_id"):
                 try:
-                    _fetch_json("POST", authorization_server.revocation_endpoint, data={
+                    _fetch_json("POST", authorization_server.revocation_endpoint, follow_redirects=False, data={
                         "token": sign_in["refresh_token"], "token_type_hint": "refresh_token",
                         "client_id": sign_in["client_id"]})
                 except StudioError:

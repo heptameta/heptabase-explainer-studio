@@ -8,6 +8,7 @@ import pytest
 
 from explainer_studio import heptabase_sign_in
 from explainer_studio.credentials import hold_credentials_lock
+from explainer_studio.errors import StudioError
 
 ISSUER = "https://heptabase.test"
 API_URL = "https://api.heptabase.test"
@@ -50,3 +51,29 @@ def test_a_sign_in_heptabase_refuses_stays_expired_rather_than_signed_out(token_
         heptabase_sign_in.require_signed_in_account_id(ISSUER)
     assert error.value.code == "sign_in_expired"
     assert heptabase_sign_in.find_signed_in_email(ISSUER) is None
+
+
+def _build_metadata(issuer: str) -> dict[str, str]:
+    """Metadata shaped as Heptabase's OAuth server serves it: every endpoint on the issuer's origin."""
+    return {"issuer": issuer, "authorization_endpoint": f"{issuer}/auth", "token_endpoint": f"{issuer}/token",
+            "registration_endpoint": f"{issuer}/v1/oauth/register", "revocation_endpoint": f"{issuer}/token/revocation"}
+
+
+@pytest.mark.parametrize(("issuer", "field_name", "value", "is_accepted"), [
+    ("https://api.heptabase.com", None, None, True),
+    ("http://localhost:3500", None, None, True),  # a local backend while developing
+    ("https://api.heptabase.com", "token_endpoint", "https://elsewhere.test/token", False),
+    ("https://api.heptabase.com", "authorization_endpoint", "javascript:alert(document.cookie)//", False),
+    ("http://api.heptabase.com", None, None, False),
+])
+def test_sign_in_uses_only_endpoints_on_the_issuers_https_origin(monkeypatch: pytest.MonkeyPatch, issuer: str,
+                                                                 field_name: str | None, value: str | None,
+                                                                 is_accepted: bool) -> None:
+    metadata = _build_metadata(issuer) | ({field_name: value} if field_name else {})
+    monkeypatch.setattr(heptabase_sign_in, "_authorization_server_by_api_url_map", {})
+    monkeypatch.setattr(heptabase_sign_in, "_fetch_json", lambda method, url, **request_options: (200, metadata))
+    if is_accepted:
+        assert heptabase_sign_in.fetch_authorization_server(API_URL).token_endpoint == f"{issuer}/token"
+    else:
+        with pytest.raises(StudioError, match="not on the issuer's own HTTPS origin"):
+            heptabase_sign_in.fetch_authorization_server(API_URL)
