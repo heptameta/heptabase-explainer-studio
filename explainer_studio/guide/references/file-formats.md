@@ -326,7 +326,6 @@ chapters:
           - id: ice_expands                              # unique in the episode; elsewhere ep02/ice_expands
             color: yellow                                # optional: yellow, green or red
             leads_to: [lakes_freeze_top]                 # arrows to cards of this episode
-            continues_from: [ep01/water_is_dense]        # arrows into this card from an earlier episode's cards
             content: |
               # Ice floats because water expands when it freezes
               1. The same water takes <hepta-color type="background" color="yellow">about 9% more room</hepta-color> as ice.
