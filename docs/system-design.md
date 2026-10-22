@@ -213,8 +213,9 @@ The macOS voice and the background music are made on the computer. A feedback bu
 `feedback.json`, its comment screenshot sheets, the `metadata.json`, `script.yaml` and `timeline.json` of every delivery
 record, the plan, `gaps.json`, the cost report of the series' planning and the episode (the agent's usage, and the
 narration's estimated cost) and the Explainer Studio version and operating system. It never carries the sources, the
-video file or the audio; the comment screenshot sheets are the only frames of the video in it. Each item records which
-bundle first carried it, so a share knows whether there is anything new to send.
+video file or the audio; the comment screenshot sheets are the only frames of the video in it. A file that a symbolic
+link or `..` takes outside its place in the series folder stops the share instead of being packed. Each item records
+which bundle first carried it, so a share knows whether there is anything new to send.
 
 ## Versions and upgrades
 
