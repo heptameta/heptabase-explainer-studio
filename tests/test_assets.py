@@ -1,12 +1,16 @@
-"""The asset commands' offline logic: licences, file names, credits, data filters, PDF crops and SVG thumbnails."""
+"""The asset commands' offline logic: licences, file names, credits, data filters, PDF crops, SVG thumbnails and
+checked downloads."""
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
+import httpx
 import pytest
 from PIL import Image
 
+from explainer_studio.assets import fetch
 from explainer_studio.assets.common import check_is_free, check_is_public_domain, choose_output_file_path, keep_rows
 from explainer_studio.assets.commons import resolve_file_title
 from explainer_studio.assets.credits import record_credit
@@ -98,3 +102,16 @@ def test_svg_thumbnails_fill_shapes_and_keep_holes() -> None:
     assert image is not None
     corner, center = image.getpixel((10, 10)), image.getpixel((50, 50))
     assert corner[0] > 200 and corner[3] > 200 and center[3] == 0
+
+
+def test_a_download_that_is_not_the_expected_file_is_deleted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    content = b"a program"
+    monkeypatch.setattr(fetch, "create_client", lambda timeout_seconds: httpx.Client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, content=content))))
+    target_file_path = tmp_path / "ffmpeg.gz"
+    with pytest.raises(StudioError, match="not the file Explainer Studio expects"):
+        fetch.download("https://example.com/ffmpeg.gz", target_file_path, expected_sha256="0" * 64)
+    assert list(tmp_path.iterdir()) == []
+    fetch.download("https://example.com/ffmpeg.gz", target_file_path,
+                   expected_sha256=hashlib.sha256(content).hexdigest())
+    assert target_file_path.read_bytes() == content

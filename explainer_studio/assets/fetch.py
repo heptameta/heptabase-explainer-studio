@@ -3,6 +3,7 @@ rate limits, and streaming downloads that land atomically."""
 
 from __future__ import annotations
 
+import hashlib
 import os
 import time
 from collections.abc import Callable
@@ -105,14 +106,17 @@ def fetch_json(url: str, params: dict[str, Any] | None = None, timeout_seconds: 
 
 
 def download(url: str, target_file_path: Path, report_progress: Callable[[str], None] | None = None,
-             label: str | None = None, timeout_seconds: float = 120) -> Path:
-    """Stream `url` to `target_file_path` with progress; a dropped or rate-limited download starts again."""
+             label: str | None = None, timeout_seconds: float = 120, expected_sha256: str | None = None) -> Path:
+    """Stream `url` to `target_file_path` with progress; a dropped or rate-limited download starts again. With
+    `expected_sha256`, a file whose SHA-256 differs is deleted and StudioError raised, so it is never unpacked or
+    run."""
     target_file_path.parent.mkdir(parents=True, exist_ok=True)
     partial_file_path = target_file_path.with_name(target_file_path.name + ".part")
     label = label or target_file_path.name
     attempts = iter(range(ATTEMPT_COUNT))
 
     def download_once() -> Path:
+        digest = hashlib.sha256()
         try:
             with create_client(timeout_seconds) as http, http.stream("GET", url) as response:
                 _raise_for_status(response, url, next(attempts))
@@ -122,11 +126,18 @@ def download(url: str, target_file_path: Path, report_progress: Callable[[str], 
                 with partial_file_path.open("wb") as handle:
                     for chunk in response.iter_bytes(1 << 20):
                         handle.write(chunk)
+                        digest.update(chunk)
                         done_fraction = response.num_bytes_downloaded / total_bytes if total_bytes else 0
                         if (report_progress and total_bytes > REPORT_ABOVE_BYTES
                                 and done_fraction >= next_report_fraction):
                             report_progress(f"  {label}: {done_fraction:.0%} of {total_bytes / 1e6:.0f} MB")
                             next_report_fraction = done_fraction + 0.1
+            if expected_sha256 is not None and digest.hexdigest() != expected_sha256:
+                raise StudioError(f"the downloaded {label} is not the file Explainer Studio expects",
+                                  f"{url} sent a file whose SHA-256 is {digest.hexdigest()}, not {expected_sha256}; "
+                                  "it was deleted without being unpacked or run",
+                                  "run the command again later; if it fails the same way, tell the user that the "
+                                  "file at that address has changed")
         except BaseException:
             partial_file_path.unlink(missing_ok=True)
             raise
