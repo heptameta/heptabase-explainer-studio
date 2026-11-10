@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from explainer_studio.errors import StudioError
-from explainer_studio.narration_providers import base, elevenlabs, macos_say, openai, voai
+from explainer_studio.narration_providers import base, elevenlabs, gemini, macos_say, openai, voai
 from explainer_studio.narration_providers.base import SynthesisError
 
 
@@ -132,6 +132,34 @@ def test_a_paid_request_is_sent_again_only_when_the_service_cannot_have_made_the
         assert len(recorder.requests) == 2
 
 
+def test_gemini_wraps_openrouter_pcm_as_wav_at_the_rate_it_names(recorded, tmp_path) -> None:
+    recorder = recorded(httpx.Response(200, content=b"\x00\x01" * 24000 + b"\x00",
+                                       headers={"content-type": "audio/pcm;rate=24000;channels=1"}))
+    output_wav_file_path = tmp_path / "beat.wav"
+    gemini.Provider().synthesize("Hello.", gemini.Settings(provider_name="gemini"), output_wav_file_path, "key", "en")
+    request = recorder.requests[0]
+    assert request["url"] == "https://openrouter.ai/api/v1/audio/speech"
+    assert request["headers"]["Authorization"] == "Bearer key"
+    assert request["json"] == {"model": "google/gemini-3.8-flash-tts", "voice": "Achernar", "input": "Hello.",
+                               "response_format": "pcm", "instructions": gemini.DEFAULT_INSTRUCTIONS}
+    with wave.open(str(output_wav_file_path)) as audio:
+        assert audio.getframerate() == 24000 and audio.getnframes() == 24000  # the odd trailing byte dropped
+
+
+def test_gemini_stops_on_a_refusal_and_skips_a_beat_without_audio(recorded, tmp_path) -> None:
+    settings = gemini.Settings(provider_name="gemini", voice="Nobody")
+    recorder = recorded(httpx.Response(402, json={"error": {"message": "Insufficient credits"}}))
+    with pytest.raises(StudioError, match="OpenRouter refused the request"):
+        gemini.Provider().synthesize("Hello.", settings, tmp_path / "a.wav", "key", "en")
+    assert len(recorder.requests) == 1
+    recorded(httpx.Response(400, json={"error": {"message": "Unknown voice"}}))
+    with pytest.raises(StudioError, match="voice Nobody"):
+        gemini.Provider().synthesize("Hello.", settings, tmp_path / "b.wav", "key", "en")
+    recorded(httpx.Response(200, json={"error": "no audio"}, headers={"content-type": "application/json"}))
+    with pytest.raises(SynthesisError, match="no mono PCM"):
+        gemini.Provider().synthesize("Hello.", settings, tmp_path / "c.wav", "key", "en")
+
+
 def test_voai_tells_settings_errors_from_server_errors(recorded, tmp_path) -> None:
     settings = voai.Settings(provider_name="voai", speaker="不存在")
     recorded(httpx.Response(500, json={"msg": "speaker 錯誤"}))
@@ -154,6 +182,9 @@ def test_cost_estimates_follow_each_price_table() -> None:
     assert voai.Provider().estimate_cost_usd("你好" * 50, voai.Settings(provider_name="voai")) == pytest.approx(1 / 31)
     flash = elevenlabs.Settings(provider_name="elevenlabs", voice_id="v", model_id="eleven_flash_v2_5")
     assert elevenlabs.Provider().estimate_cost_usd("x" * 1000, flash) == pytest.approx(0.04)
+    # a minute of English speech is 1,920 audio tokens
+    assert gemini.Provider().estimate_cost_usd("word " * 165, gemini.Settings(provider_name="gemini")) == pytest.approx(
+        1920 * 9 / 1_000_000)
 
 
 def test_macos_voices_are_parsed_and_chosen_by_language(monkeypatch) -> None:

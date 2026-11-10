@@ -81,6 +81,7 @@ Narration providers and their fields:
 |---|---|
 | `elevenlabs` | `voice_id` (required), `model_id`, `voice_settings` |
 | `openai` | `model`, `voice`, `instructions`, `speed` |
+| `gemini` | `model`, `voice`, `instructions` (Gemini through OpenRouter; no speed setting: ask for the pace in `instructions`) |
 | `voai` | `version`, `speaker`, `style`, `speed` |
 | `macos-say` | `voice`, `words_per_minute` (free, macOS only, mechanical voice: for trying things) |
 
@@ -97,7 +98,7 @@ When the script departs from them, update the plan.
 | `language_code` | text | yes |
 | `user_language_code` | text or null | no |
 | `narration_budget_usd` | number or null | no |
-| `narration` | settings with `provider_name`: `elevenlabs` / `openai` / `voai` / `macos-say` or null | no |
+| `narration` | settings with `provider_name`: `elevenlabs` / `openai` / `gemini` / `voai` / `macos-say` or null | no |
 | `background_music` | settings with `provider_name`: `synthesized-piano` / `none` or null | no |
 | `has_end_credits` | true / false | no |
 | `audience` | Audience | yes |
@@ -138,7 +139,7 @@ When the script departs from them, update the plan.
 | `takeaway` | text | yes |
 | `source_scope` | text or null | no |
 | `language_code` | text or null | no |
-| `narration` | settings with `provider_name`: `elevenlabs` / `openai` / `voai` / `macos-say` or null | no |
+| `narration` | settings with `provider_name`: `elevenlabs` / `openai` / `gemini` / `voai` / `macos-say` or null | no |
 | `background_music` | settings with `provider_name`: `synthesized-piano` / `none` or null | no |
 
 **ExcludedTopic**
@@ -390,7 +391,7 @@ settings stay the same, so editing only a narration text that reads the same cos
 
 | Field | Type | Required |
 |---|---|---|
-| `settings` | settings with `provider_name`: `elevenlabs` / `openai` / `voai` / `macos-say` | yes |
+| `settings` | settings with `provider_name`: `elevenlabs` / `openai` / `gemini` / `voai` / `macos-say` | yes |
 | `beats` | list of NarratedBeat | no |
 
 **NarratedBeat**

@@ -143,8 +143,8 @@ codex plugin marketplace add heptameta/heptabase-agent-plugins
 
 ## Narration, languages and cost
 
-Narration uses your own key from [ElevenLabs](https://elevenlabs.io), [OpenAI](https://platform.openai.com) or
-[VoAI](https://voai.ai). Enter it in your terminal, so it never goes through the chat:
+Narration uses your own key from [ElevenLabs](https://elevenlabs.io), [OpenAI](https://platform.openai.com),
+[OpenRouter](https://openrouter.ai) (for Gemini's voices) or [VoAI](https://voai.ai). Enter it in your terminal, so it never goes through the chat:
 
 ```bash
 explainer-studio setup narration

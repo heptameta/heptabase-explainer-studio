@@ -200,7 +200,7 @@ What users are told about this, feedback sharing above all, is in [PRIVACY.md](.
 
 | To | What | When |
 |---|---|---|
-| The narration provider (ElevenLabs, OpenAI or VoAI) | Each beat's spoken text and the episode's narration settings (for OpenAI, its voice instructions), with the user's key; ElevenLabs also gets the neighbouring beats' spoken text, for intonation | `narrate` |
+| The narration provider (ElevenLabs, OpenAI, OpenRouter for Gemini, or VoAI) | Each beat's spoken text and the episode's narration settings (for OpenAI and Gemini, its voice instructions; OpenRouter passes Gemini's request to Google), with the user's key; ElevenLabs also gets the neighbouring beats' spoken text, for intonation | `narrate` |
 | The same provider | The key the user enters, to test it | `setup narration` |
 | Asset sites (Wikimedia Commons, Bioicons, Wikipedia, Our World in Data, the World Bank) | Search queries and downloads | `asset` commands |
 | A web page the agent records | A visit by a headless browser | `asset playwright record` |

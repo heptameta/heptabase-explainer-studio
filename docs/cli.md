@@ -36,7 +36,7 @@ Install Blender (about 1 GB) for `asset blender render`, unless a recent one is 
 #### `explainer-studio setup narration`
 
 ```text
-explainer-studio setup narration [elevenlabs|openai|voai|macos-say]
+explainer-studio setup narration [elevenlabs|openai|gemini|voai|macos-say]
 ```
 
 Choose a narration provider, enter its API key (hidden), test it and save it to credentials.toml.

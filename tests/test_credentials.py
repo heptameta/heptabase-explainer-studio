@@ -14,7 +14,7 @@ from explainer_studio import credentials
 @pytest.fixture
 def config(tmp_path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("explainer_studio.user_dirs.get_config_dir_path", lambda: tmp_path / "config")
-    for variable in ("ELEVENLABS_API_KEY", "OPENAI_API_KEY", "VOAI_API_KEY"):
+    for variable in ("ELEVENLABS_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "VOAI_API_KEY"):
         monkeypatch.delenv(variable, raising=False)
     return tmp_path / "config"
 

@@ -12,7 +12,7 @@ This page says what each one is and what happens to it.
 | Heptabase | An episode's feedback bundle | Only when you agree to share it | This page |
 | Heptabase | The video page's whiteboard view loads Heptabase's web app in a frame, which draws the cards inside your browser; the cards do not leave your computer for it | When you open the whiteboard view, and in the background when a saved series has episodes to add | Heptabase's |
 | Heptabase | The sign-in to your Heptabase account (Heptabase tells Studio which account signed in and its email, which Studio keeps on this computer to show where saving goes), then the series' title, each episode's and chapter's title, the cards, their pictures (frames of your videos, and pictures from the series folder) and where each goes, to a whiteboard in your own Heptabase account | Only once you press Save to Heptabase on the video page; after that, when you open any of the series' video pages, every delivered episode not on the whiteboard yet | Heptabase's, under your account |
-| The narration provider you chose (ElevenLabs, OpenAI or VoAI) | The narration text and voice settings, with your key | When the agent narrates an episode, and when you test your key | The provider's, under your account |
+| The narration provider you chose (ElevenLabs, OpenAI, OpenRouter for Gemini, or VoAI) | The narration text and voice settings, with your key | When the agent narrates an episode, and when you test your key | The provider's, under your account |
 | Image and data sites (Wikimedia Commons, Bioicons, Wikipedia, Our World in Data, the World Bank) | Search queries, and the files the agent downloads | When the agent looks for pictures or data | Each site's |
 | Web pages the agent records | A visit by a browser with no window | When the agent records a page for a video | Each site's |
 | GitHub and the sites tools come from (astral.sh, PyPI, CTAN mirrors, blender.org, Playwright) | Checks for a new release, and downloads | When installing, setting up or upgrading; `doctor` checks for a new release at most once a day | Each site's |
@@ -76,7 +76,8 @@ Explainer Studio talks to these services directly from your computer, with your 
 it goes through Heptabase. What each service does with it is governed by its own terms.
 
 - **Narration:** when the agent narrates an episode, each beat's narration text and the episode's narration settings
-  (for OpenAI, its voice instructions) go to the provider you chose, with your key; ElevenLabs also gets the text of
+  (for OpenAI and Gemini, its voice instructions) go to the provider you chose, with your key (for Gemini, to OpenRouter,
+  which passes them to Google); ElevenLabs also gets the text of
   the beats around each one, for intonation. `explainer-studio setup narration` sends the key you enter to the
   provider once, to test it. The key is kept on your computer and never goes through the chat.
 - **Images and data:** when the agent looks for pictures or data, its search queries go to Wikimedia Commons,

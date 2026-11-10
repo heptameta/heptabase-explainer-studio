@@ -65,6 +65,9 @@ Load this when the narration is English. Length is counted in **words**.
   expressive; do not set an older model. The plan page lists other voices; another Voice Library voice works by its id.
 - **Paid narration with OpenAI:** `{provider_name: openai, model: gpt-4o-mini-tts, voice: ash}`, with `instructions`
   asking for a warm, curious voice, not a newsreader's.
+- **Paid, conversational narration with Gemini:** `{provider_name: gemini, voice: Achernar}` (through OpenRouter,
+  model `google/gemini-3.8-flash-tts`). It has no speed setting: ask for the pace in `instructions`, and listen to the
+  first scene before narrating the rest. Vocal tags in the spoken text (`[laughs]`) are performed, not read.
 - **Trying things for free:** `{provider_name: macos-say}` (macOS only, Samantha, mechanical). Use it only to check
   pictures; anything meant to be watched uses a paid voice.
 - **Changing what the voice reads, not the subtitles:** set `spoken_text_override` on that beat. Common uses: spelling
