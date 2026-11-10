@@ -93,6 +93,29 @@ install scripts install the release: if a chat runs one during a dev build (uv m
 half-made changes, and its videos could not say which version made them. A dev build and the release share
 `credentials.toml`, `settings.toml`, the programs `setup` installs, and series folders.
 
+## Narrating with Gemini
+
+The `gemini` narration provider (`explainer_studio/narration_providers/gemini.py`) speaks with Gemini text to speech
+through OpenRouter, for a more conversational voice than the others:
+
+- The user saves an OpenRouter key (`sk-or-v1-` followed by 64 hex characters) with
+  `explainer-studio setup narration gemini` in their own terminal; narration reads `OPENROUTER_API_KEY` first, then
+  `credentials.toml`. A key in any other format gets HTTP 401 "Missing Authentication header" from OpenRouter.
+  The key is entered once per provider: `credentials.toml` keeps it for every later run, the dev build and the release
+  alike. There is no `.env`: a key never goes in a series folder or this repository.
+- The plan's narration is `{provider_name: gemini, voice: Achernar}`. The other fields are `model` (default
+  `google/gemini-3.8-flash-tts`; `google/gemini-3.8-flash-lite-tts` is cheaper and flatter) and `instructions`.
+  The other suggested voices are Sulafat, Gacrux, Kore, Leda and Aoede.
+- Gemini has no speed setting: the pace and tone come from `instructions`, whose default asks for a relaxed,
+  conversational voice at a brisk pace. Vocal tags in the spoken text (`[laughs]`) are performed, not read.
+- A first test (Achernar, default instructions) read about 169 words per minute and came back as 24 kHz mono PCM.
+  A full 14-minute episode (107 beats, 10,712 characters) was estimated at $0.21. The estimate assumes 32 audio
+  tokens per second at $9 per million (about $0.017 a minute); it has not been checked against OpenRouter's billing.
+- Until a release includes `gemini`, chats can use it only through a dev build (`scripts/use_dev_build.py`).
+  `explainer-studio upgrade` and the skill's install scripts install the release, which drops it: run
+  `use_dev_build.py` again after either. Once a release includes it, a plain upgrade keeps it and no dev build is
+  needed.
+
 ## Compatibility
 
 Users upgrade silently to every release (`explainer-studio upgrade`, between episodes), so a change keeps existing

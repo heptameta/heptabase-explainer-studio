@@ -175,7 +175,7 @@ flowchart LR
 ```
 
 **narration**: An episode's voice-over: each beat's spoken text made into speech by a narration provider (ElevenLabs,
-OpenAI, VoAI, or the free macOS voice) with the plan's narration settings for the episode. Paid narration counts
+OpenAI, Gemini through OpenRouter, VoAI, or the free macOS voice) with the plan's narration settings for the episode. Paid narration counts
 against the series' narration budget; `narrate` reuses a beat's audio while its spoken text and the narration settings
 stay the same (`episodes/<episode>/narration/`). Not the narration text, which is what a beat says.
 

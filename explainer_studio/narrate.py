@@ -124,7 +124,7 @@ def _make_narration(series: Series, episode_id: str, forced_beat_ids: list[str] 
         raise StudioError(f"{episode_id} has no narration settings",
                           "plan.yaml sets no `narration` (series level, or episodes[].narration for this episode)",
                           "add a narration block to production/plan.yaml, for example `narration: {provider_name: "
-                          "openai, voice: ash}` (providers: elevenlabs, openai, voai, macos-say)")
+                          "openai, voice: ash}` (providers: elevenlabs, openai, gemini, voai, macos-say)")
     provider = narration_providers.get_provider(narration_settings.provider_name)
     provider.require_available()
     require_script_review(series, episode_id, script)

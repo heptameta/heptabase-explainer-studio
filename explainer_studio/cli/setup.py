@@ -15,7 +15,7 @@ from .doctor import format_check_summary_lines
 def _format_api_key_line() -> str:
     from ..environment import get_operating_system
 
-    line = ("Narration needs a paid API key (ElevenLabs, OpenAI or VoAI) before the first `narrate`; set it later "
+    line = ("Narration needs a paid API key (ElevenLabs, OpenAI, Gemini through OpenRouter, or VoAI) before the first `narrate`; set it later "
             "with `explainer-studio setup narration` in your own terminal.")
     is_macos = get_operating_system() == "macos"
     return line + (" On macOS the free macos-say voice works without a key." if is_macos else "")

@@ -11,13 +11,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from . import elevenlabs, macos_say, openai, voai
+from . import elevenlabs, gemini, macos_say, openai, voai
 from .base import NarrationProvider
 
-NarrationProviderName = Literal["elevenlabs", "openai", "voai", "macos-say"]
+NarrationProviderName = Literal["elevenlabs", "openai", "gemini", "voai", "macos-say"]
 
 PROVIDER_BY_NAME_MAP: dict[NarrationProviderName, type[NarrationProvider]] = {
-    module.Provider.name: module.Provider for module in (elevenlabs, openai, voai, macos_say)
+    module.Provider.name: module.Provider for module in (elevenlabs, openai, gemini, voai, macos_say)
 }
 
 SETTINGS_MODELS = tuple(provider.settings_model for provider in PROVIDER_BY_NAME_MAP.values())

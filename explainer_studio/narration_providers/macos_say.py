@@ -75,7 +75,7 @@ class Provider(NarrationProvider):
         if sys.platform != "darwin" or shutil.which("say") is None:
             raise StudioError("the macos-say voice works only on macOS",
                               "it uses the `say` command that comes with macOS",
-                              "set plan.yaml narration to elevenlabs, openai or voai, and ask the user to run "
+                              "set plan.yaml narration to elevenlabs, openai, gemini or voai, and ask the user to run "
                               "`explainer-studio setup narration` in their own terminal")
 
     def choose_voice(self, settings: Settings, language_code: str) -> str:

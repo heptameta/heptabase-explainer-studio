@@ -6,6 +6,11 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Added
+
+- A Gemini narration provider for more conversational voices, through your OpenRouter key
+  (`narration: {provider_name: gemini, voice: Achernar}`, set up with `explainer-studio setup narration gemini`).
+
 ## [1.3.0] - 2026-10-22
 
 ### Added
