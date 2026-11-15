@@ -65,7 +65,7 @@ def test_elevenlabs_requests_pcm_and_wraps_it_as_wav(recorded, tmp_path) -> None
     request = recorder.requests[0]
     assert request["url"].endswith("/v1/text-to-speech/JBFqnCBsd6RMkjVDRZzb")
     assert request["params"] == {"output_format": "pcm_24000"} and request["headers"]["xi-api-key"] == "key"
-    assert request["json"] == {"text": "Hello there.", "model_id": "eleven_v4",
+    assert request["json"] == {"text": "Hello there.", "model_id": "eleven_v4", "language_code": "en",
                                "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
                                "previous_text": "Before.", "next_text": "After."}
     with wave.open(str(output_wav_file_path)) as audio:
@@ -77,7 +77,13 @@ def test_elevenlabs_leaves_out_the_neighbors_for_a_model_that_refuses_them(recor
     recorder = recorded(httpx.Response(200, content=b"\x00\x01" * 100))
     settings = elevenlabs.Settings(provider_name="elevenlabs", voice_id="JBFqnCBsd6RMkjVDRZzb", model_id="eleven_v3")
     elevenlabs.Provider().synthesize("Hi.", settings, tmp_path / "a.wav", "key", "en", "Before.", "After.")
-    assert recorder.requests[0]["json"] == {"text": "Hi.", "model_id": "eleven_v3"}
+    assert recorder.requests[0]["json"] == {"text": "Hi.", "model_id": "eleven_v3", "language_code": "en"}
+
+
+def test_elevenlabs_sends_the_episode_language_so_the_model_does_not_guess_it(recorded, tmp_path) -> None:
+    recorder = recorded(httpx.Response(200, content=b"\x00\x01" * 100))
+    elevenlabs.Provider().synthesize("值要照寫入的樣子回來。", ELEVENLABS_SETTINGS, tmp_path / "a.wav", "key", "zh-TW")
+    assert recorder.requests[0]["json"]["language_code"] == "zh"
 
 
 def test_elevenlabs_retries_rate_limits_and_stops_on_a_refused_key(recorded, tmp_path) -> None:

@@ -6,6 +6,10 @@ in [UPGRADING.md](UPGRADING.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- ElevenLabs narration is read in the episode's language: a Chinese episode no longer has beats read in Cantonese.
+
 ## [1.3.0] - 2026-10-22
 
 ### Added
