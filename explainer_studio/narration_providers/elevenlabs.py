@@ -2,7 +2,8 @@
 
 Audio is requested as raw 24 kHz PCM, which every plan may use (44.1 kHz PCM and WAV need the Pro plan). Each beat is
 sent with its neighbors' spoken text as `previous_text` and `next_text`, so beats synthesized one at a time keep the
-intonation of continuous speech; the service does not bill that text.
+intonation of continuous speech; the service does not bill that text. Each beat also carries the episode's language,
+since without it the model guesses the language from the text and can read Traditional Chinese as Cantonese.
 """
 
 from __future__ import annotations
@@ -105,7 +106,8 @@ class Provider(NarrationProvider):
                    language_code: str, previous_spoken_text: str | None = None,
                    next_spoken_text: str | None = None) -> Synthesis:
         assert isinstance(settings, Settings) and api_key
-        body: dict = {"text": text, "model_id": settings.model_id}
+        # the service takes ISO 639-1 codes, so zh-TW is sent as zh
+        body: dict = {"text": text, "model_id": settings.model_id, "language_code": language_code.split("-")[0].lower()}
         if not settings.model_id.startswith(MODEL_ID_PREFIXES_WITHOUT_CONTEXT):
             if previous_spoken_text:
                 body["previous_text"] = previous_spoken_text
